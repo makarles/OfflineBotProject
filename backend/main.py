@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import httpx
+from backend.db.database import init_db
+
 
 app = FastAPI(title="SkyAssist API")
 
 
+@app.on_event("startup")
+async def startup():
+    init_db()
 class ChatRequest(BaseModel):
     message: str
     language: str = "ru"
