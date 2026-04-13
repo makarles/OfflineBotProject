@@ -14,8 +14,8 @@ def seed():
     # Тестовый рейс
     flight = Flight(
         flight_number="AL-1234",
-        origin="SVO",
-        destination="DXB",
+        origin="Москва (SVO)",
+        destination="Дубай (DXB)",
         departure_time="2026-04-15 10:30",
         arrival_time="2026-04-15 16:45",
         aircraft_type="Airbus A320",
