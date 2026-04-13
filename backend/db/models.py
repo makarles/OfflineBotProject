@@ -11,13 +11,13 @@ class Flight(Base):
     id = Column(Integer, primary_key=True)
     flight_number = Column(String, nullable=False)
     origin = Column(String, nullable=False)
-    destination = Column(DateTime, nullable=False)
-    departure_time = Column(DateTime, nullable=False)
-    arrival_time = Column(DateTime, nullable=False)
+    destination = Column(String, nullable=False)
+    departure_time = Column(String, nullable=False)
+    arrival_time = Column(String, nullable=False)
     aircraft_type = Column(String)
     aircraft_reg = Column(String)
-    cruising_altitude = Column(String)
-    cruising_speed = Column(String)
+    cruising_altitude = Column(Integer)
+    cruising_speed = Column(Integer)
 
 
 class MenuItem(Base):
