@@ -1,8 +1,12 @@
 import pickle
 import faiss
+import os
 import numpy as np
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
 
 INDEX_PATH = Path("data/faiss_index.bin")
 CHUNKS_PATH = Path("data/chunks.pkl")

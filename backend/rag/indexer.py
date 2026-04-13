@@ -7,6 +7,9 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+
 KNOWLEDGE_BASE_DIR = Path("data/knowledge_base")
 INDEX_PATH = Path("data/faiss_index.bin")
 CHUNKS_PATH = Path("data/chunks.pkl")
