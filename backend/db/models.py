@@ -18,6 +18,9 @@ class Flight(Base):
     aircraft_reg = Column(String)
     cruising_altitude = Column(Integer)
     cruising_speed = Column(Integer)
+    return_flight_number = Column(String)
+    return_departure_time = Column(String)
+    return_arrival_time = Column(String)
 
 
 class MenuItem(Base):
@@ -41,3 +44,27 @@ class CommercialOffer(Base):
     title = Column(String, nullable=False)
     description = Column(Text)
     category = Column(String)
+
+
+class Aircraft(Base):
+    __tablename__ = "aircraft"                     # Пример данных
+
+    id = Column(Integer, primary_key=True)
+    registration = Column(String, nullable=False)  # RA-89012
+    aircraft_type = Column(String, nullable=False)  # Airbus A320
+    manufacturer = Column(String)                   # Airbus
+    capacity_economy = Column(Integer)              # 150
+    capacity_business = Column(Integer)             # 12
+    year_manufactured = Column(Integer)             # 2018
+    status = Column(String, default="active")       # active / maintenance
+
+class Route(Base):
+    __tablename__ = "routes"                            # Пример данных
+
+    id = Column(Integer, primary_key=True)
+    destination_city = Column(String, nullable=False)   # Дубай
+    destination_iata = Column(String, nullable=False)   # DXB
+    destination_country = Column(String)                # ОАЭ
+    is_domestic = Column(Integer, default=0)            # 0=международный, 1=внутренний
+    flight_duration_min = Column(Integer)               # 255 (минуты)
+    distance_km = Column(Integer)                       # 3500

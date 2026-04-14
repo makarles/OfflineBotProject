@@ -6,7 +6,7 @@ def get_flight_info(db: Session) -> dict:
     flight = db.query(Flight).first()
     if not flight:
         return {}
-    return {
+    result = {
         "flight_number": flight.flight_number,
         "origin": flight.origin,
         "destination": flight.destination,
@@ -15,8 +15,17 @@ def get_flight_info(db: Session) -> dict:
         "aircraft_type": flight.aircraft_type,
         "aircraft_reg": flight.aircraft_reg,
         "cruising_altitude": flight.cruising_altitude,
-        "cruising_speed": flight.cruising_speed
+        "cruising_speed": flight.cruising_speed,
     }
+    if flight.return_flight_number:
+        result["return_flight"] = {
+            "flight_number": flight.return_flight_number,
+            "departure_time": flight.return_departure_time,
+            "arrival_time": flight.return_arrival_time,
+            "origin": flight.destination,
+            "destination": flight.origin,
+        }
+    return result
 
 
 def get_menu(db: Session, cabin_class: str = "economy") -> list:
