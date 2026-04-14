@@ -53,6 +53,11 @@ async def root():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
+
+    context = "Информация недоступна."
+    is_db = is_db_query(request.message)
+    print(f"DEBUG: is_db_query={is_db}, message='{request.message}'")
+
     if is_db_query(request.message):
         flight = get_flight_info(db)
         menu = get_menu(db)
@@ -89,6 +94,36 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             offers_text += f"- {offer['title']}: {offer['description']}\n"
 
         context = f"{flight_text}\n\n{menu_text}\n{offers_text}"
+
+    else:
+        # RAG-ветка
+        # Сначала пробуем найти город по названию напрямую
+        chunks = retrieve(request.message, top_k=5)
+
+        # Если не нашли с хорошим score — ищем по ключевым словам в названии чанков
+        if not chunks or chunks[0]['score'] < 0.35:
+            message_lower = request.message.lower()
+            from backend.rag.retriever import _load, _chunks
+            _load()
+            direct_matches = []
+            if _chunks:
+                for chunk in _chunks:
+                    city = chunk.get('city', '').lower()
+                    title = chunk.get('title', '').lower()
+                    if city and city in message_lower:
+                        direct_matches.append(chunk)
+                    elif title and any(word in message_lower
+                                       for word in title.split() if len(word) > 3):
+                        direct_matches.append(chunk)
+            if direct_matches:
+                chunks = direct_matches
+
+        if chunks:
+            context = "Найденная информация:\n\n"
+            for chunk in chunks[:3]:  # берём максимум 3
+                context += f"[{chunk['title']}]\n{chunk['text']}\n\n"
+        else:
+            context = "Информация по данному запросу не найдена."
 
     system_prompt = f"""Ты — бортовой ассистент авиакомпании AeroLine.
 Ты работаешь на борту воздушного судна во время полёта.

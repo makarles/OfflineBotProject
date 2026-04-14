@@ -29,7 +29,7 @@ def _load():
             _chunks = pickle.load(f)
 
 
-def retrieve(query: str, top_k: int = 3) -> list[dict]:
+def retrieve(query: str, top_k: int = 5, min_score: float = 0.25) -> list[dict]:
     _load()
 
     embedding = _model.encode([query])
@@ -41,6 +41,8 @@ def retrieve(query: str, top_k: int = 3) -> list[dict]:
     results = []
     for score, idx in zip(scores[0], indices[0]):
         if idx == -1:
+            continue
+        if float(score) < min_score:
             continue
         chunk = _chunks[idx].copy()
         chunk["score"] = float(score)
