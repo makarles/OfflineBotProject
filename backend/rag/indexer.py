@@ -21,10 +21,12 @@ CHUNK_OVERLAP = 50
 
 def load_documents() -> list[dict]:
     documents = []
-    for file in KNOWLEDGE_BASE_DIR.glob("*.json"):
-        with open(file, "r", encoding="utf-8") as f:
-            doc = json.load(f)
-            documents.append(doc)
+    # из корневой папки и из подпапки cities
+    for pattern in ["*.json", "cities/*.json"]:
+        for file in KNOWLEDGE_BASE_DIR.glob(pattern):
+            with open(file, "r", encoding="utf-8") as f:
+                doc = json.load(f)
+                documents.append(doc)
     print(f"Загружено документов: {len(documents)}")
     return documents
 

@@ -9,3 +9,4 @@ data/faiss_index.bin
 data/chunks.pkl
 data/skyassist.db
 data/snapshots/
+data/knowledge_base/cities
