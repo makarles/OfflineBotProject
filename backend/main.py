@@ -53,31 +53,42 @@ async def root():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
-
     if is_db_query(request.message):
-        # Маршрут 1: данные из БД
         flight = get_flight_info(db)
         menu = get_menu(db)
         offers = get_commercial_offers(db)
-        context = f"""
-Информация о рейсе:
-{json.dumps(flight, ensure_ascii=False, indent=2)}
 
-Меню (эконом-класс):
-{json.dumps(menu, ensure_ascii=False, indent=2)}
+        # Форматирование информации о рейсе в читаемый текст
+        flight_text = f"""Рейс: {flight.get('flight_number', '—')}
+    Маршрут: {flight.get('origin', '—')} → {flight.get('destination', '—')}
+    Вылет: {flight.get('departure_time', '—')}
+    Прибытие: {flight.get('arrival_time', '—')}
+    Воздушное судно: {flight.get('aircraft_type', '—')} (бортовой номер {flight.get('aircraft_reg', '—')})
+    Крейсерская высота: {flight.get('cruising_altitude', '—')} м
+    Крейсерская скорость: {flight.get('cruising_speed', '—')} км/ч"""
 
-Специальные предложения:
-{json.dumps(offers, ensure_ascii=False, indent=2)}
-"""
-    else:
-        # Маршрут 2: RAG
-        chunks = retrieve(request.message, top_k=3)
-        if chunks:
-            context = "Найденная информация:\n\n"
-            for chunk in chunks:
-                context += f"[{chunk['title']}]\n{chunk['text']}\n\n"
-        else:
-            context = "Информация по данному запросу не найдена."
+        if flight.get('return_flight'):
+            rf = flight['return_flight']
+            flight_text += f"""
+
+    Обратный рейс: {rf.get('flight_number', '—')}
+    Маршрут: {rf.get('origin', '—')} → {rf.get('destination', '—')}
+    Вылет: {rf.get('departure_time', '—')}
+    Прибытие: {rf.get('arrival_time', '—')}"""
+
+        # Форматирование меню
+        menu_text = "Меню (эконом-класс):\n"
+        for item in menu:
+            veg = " (вегетарианское)" if item['is_vegetarian'] else ""
+            price = "включено в билет" if item['price'] == 0.0 else f"{item['price']} руб."
+            menu_text += f"- {item['name']}{veg}: {item['description']} — {price}\n"
+
+        # Форматирование предложения
+        offers_text = "Специальные предложения:\n"
+        for offer in offers:
+            offers_text += f"- {offer['title']}: {offer['description']}\n"
+
+        context = f"{flight_text}\n\n{menu_text}\n{offers_text}"
 
     system_prompt = f"""Ты — бортовой ассистент авиакомпании AeroLine.
 Ты работаешь на борту воздушного судна во время полёта.
@@ -91,6 +102,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
 6. Переводи все термины на язык пользователя.
 7. Отвечай на языке пользователя (русский или английский).
 8. Будь кратким и точным.
+9. Отвечай грамотными русскими предложениями, избегай дословного перевода технических терминов.
+10. Высоту указывай как «крейсерская высота», скорость как «крейсерская скорость».
 
 {context}"""
 
