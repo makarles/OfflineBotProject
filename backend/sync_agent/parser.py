@@ -108,8 +108,8 @@ CITIES = [
 ]
 
 
-def parse_wikivoyage(city_name: str, lang: str = "ru") -> str:
-    url = f"https://{lang}.wikivoyage.org/wiki/{city_name}"
+def parse_wikipedia(city_name: str) -> str:
+    url = "https://ru.wikipedia.org/api/rest_v1/page/summary/" + city_name
     headers = {"User-Agent": "SkyAssist-Bot/1.0 (educational project)"}
 
     try:
@@ -117,25 +117,13 @@ def parse_wikivoyage(city_name: str, lang: str = "ru") -> str:
         if response.status_code != 200:
             return ""
 
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        for tag in soup.find_all(["script", "style", "sup"]):
-            tag.decompose()
-
-        content_div = soup.find("div", class_="mw-parser-output")
-        if not content_div:
-            return ""
-
-        # Берём весь текст напрямую
-        full_text = content_div.get_text(separator=" ", strip=True)
-        print(f"  Текст (первые 300 символов): {full_text[:300]}")
-
-        return full_text[:3000] if full_text else ""
+        data = response.json()
+        extract = data.get("extract", "")
+        return extract[:3000] if extract else ""
 
     except Exception as e:
         print(f"Ошибка при парсинге {city_name}: {e}")
         return ""
-
 
 def parse_all_cities():
     print(f"Начинаем парсинг {len(CITIES)} городов...")
@@ -145,7 +133,7 @@ def parse_all_cities():
     for i, city in enumerate(CITIES):
         print(f"[{i+1}/{len(CITIES)}] Парсим {city['city']}...")
 
-        content = parse_wikivoyage(city["wikivoyage"], city["lang"])
+        content = parse_wikipedia(city["wikivoyage"])
 
         if content:
             doc = {
