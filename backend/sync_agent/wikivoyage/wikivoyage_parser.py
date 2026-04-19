@@ -136,11 +136,10 @@ def _clean_wikitext(raw: str) -> str:
             continue
 
     text = parsed.strip_code(normalize=True, collapse=True)
-
-    # Буллеты звёздочек → тире для читаемости
-    text = re.sub(r"^\*+\s*", "- ", text, flags=re.MULTILINE)
-    # Решётки нумерованных списков → тире
-    text = re.sub(r"^#+\s*", "- ", text, flags=re.MULTILINE)
+    # Остатки от картинок: "thumb|350px|описание" или "thumb | 300px | описание"
+    text = re.sub(r"thumb\s*\|\s*(?:\d+px\s*\|\s*)?", "", text)
+    # Пустые скобки от удалённых wikilinks: "Airport () — chief"
+    text = re.sub(r"\(\s*\)", "", text)
 
     # Схлопывание пустых строк и лишних пробелов
     lines = [line.strip() for line in text.split("\n")]
@@ -213,8 +212,6 @@ def parse_wikivoyage_article(
         elif section_name in PRACTICAL_SECTIONS:
             key = PRACTICAL_SECTIONS[section_name]
             practical_info[key] = cleaned
-        # Прочие секции игнорируются — это сознательный выбор:
-        # не хотим тянуть "Talk", "Respect" и пр. в туристический контент.
 
     content = "\n\n".join(content_parts).strip()
 

@@ -26,8 +26,8 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 # Конфиг RAG
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
-RAG_CONTEXT_CHUNKS = int(os.getenv("RAG_CONTEXT_CHUNKS", "3"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "12"))
+RAG_CONTEXT_CHUNKS = int(os.getenv("RAG_CONTEXT_CHUNKS", "10"))
 
 
 @asynccontextmanager
@@ -105,7 +105,25 @@ def build_flight_block(db: Session) -> str:
 # Сборка блока KNOWLEDGE из RAG
 def build_knowledge_block(query: str) -> str:
     chunks = retrieve(query, top_k=RAG_TOP_K)
+
+    # ОТЛАДКА
+    logger.info("RAG query: %r", query)
+    for i, c in enumerate(chunks[:8]):
+        logger.info("  [%d] score=%.3f city=%s section=%s text=%s",
+                    i, c.get("score", 0), c.get("city", "?"),
+                    c.get("section", "?"), c.get("text", "")[:100])
+    # /ОТЛАДКА
+
     if not chunks:
+        return ""
+
+    MIN_TOP_SCORE = 0.60
+    top_score = chunks[0].get("score", 0.0)
+    if top_score < MIN_TOP_SCORE:
+        logger.info(
+            "KNOWLEDGE dropped: top score %.3f < %.2f (no relevant chunks)",
+            top_score, MIN_TOP_SCORE
+        )
         return ""
 
     lines = ["=== KNOWLEDGE (справочная информация) ==="]
@@ -119,36 +137,83 @@ def build_knowledge_block(query: str) -> str:
     return "\n".join(lines).strip()
 
 
-# Системный промпт
-SYSTEM_PROMPT_TEMPLATE = """Ты — бортовой ассистент авиакомпании AeroLine.
-Ты работаешь на борту воздушного судна во время полёта.
+# Определение языка пользователя
+def detect_language(text: str) -> str:
+    if not text:
+        return "ru"
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return "ru"
+    cyrillic = sum(1 for c in letters if "\u0400" <= c <= "\u04FF")
+    return "ru" if cyrillic / len(letters) > 0.3 else "en"
 
-СТРОГИЕ ПРАВИЛА:
-1. Отвечай ТОЛЬКО на основе информации из блоков FLIGHT и KNOWLEDGE ниже.
-2. Если в блоках нет информации для ответа — отвечай: "К сожалению, у меня нет такой информации."
-3. Никогда не добавляй данные, которых нет в блоках.
-4. Не давай советов и рекомендаций, которых нет в блоках.
-5. Не добавляй прощальных фраз и предложений обратиться к экипажу.
-6. Отвечай на языке пользователя (русский или английский).
-7. Будь кратким и точным.
-8. Отвечай грамотными предложениями, избегай дословного перевода технических терминов.
-9. Высоту указывай как «крейсерская высота», скорость как «крейсерская скорость».
-10. Если блок FLIGHT или KNOWLEDGE отсутствует — не выдумывай его содержимое.
 
---- КОНТЕКСТ ---
+# Системный промпт RU
+SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиакомпании AeroLine.
+
+ИНСТРУКЦИИ:
+1. Отвечай на вопрос пассажира, используя ТОЛЬКО факты из блока КОНТЕКСТ ниже.
+2. Для вопросов о текущем рейсе, меню, времени вылета/прилёта — используй
+   блок FLIGHT. Для вопросов о городах, визах, транспорте, достопримечатель-
+   ностях — используй блок KNOWLEDGE.
+3. Если в контексте есть подходящая информация — давай прямой, полезный ответ.
+   Не начинай ответ с оговорок о том, что есть или чего нет в контексте.
+4. Используй ТОЛЬКО те названия, места, цены и факты, которые буквально
+   написаны в контексте. Не добавляй достопримечательности, музеи или детали
+   из своих общих знаний — даже если они известные или скорее всего верные.
+5. Если в контексте ничего нет по теме, кратко скажи что у тебя нет такой
+   информации — и остановись. Не отвечай дальше.
+6. Отвечай ТОЛЬКО на русском языке. Будь кратким: 2-5 предложений или
+   короткие маркеры для списков.
+7. Не добавляй прощальных фраз и предложений обратиться к экипажу.
+8. Высоту указывай как «крейсерская высота», скорость — «крейсерская скорость».
+
+КОНТЕКСТ:
 {context}
---- КОНЕЦ КОНТЕКСТА ---"""
+
+Вопрос: {question}
+Ответ:"""
+
+
+# Системный промпт EN
+SYSTEM_PROMPT_EN = """You are an in-flight assistant for AeroLine airline.
+
+INSTRUCTIONS:
+1. Answer the passenger's question using ONLY facts from the CONTEXT below.
+2. For questions about the current flight, menu, departure/arrival times —
+   use the FLIGHT block. For questions about cities, visas, transport,
+   attractions — use the KNOWLEDGE block.
+3. If the context contains relevant information — give a direct, helpful answer.
+   Do not preface your answer with disclaimers about what the context does or
+   does not contain.
+4. Use ONLY names, places, prices and facts that are literally written in the
+   context. Never add landmarks, museums, or details from your general
+   knowledge — even if they are famous or likely correct.
+5. If the context has nothing on the topic, briefly say you don't have that
+   information and stop. Do not then proceed to answer anyway.
+6. Reply ONLY in English. Be concise: 2-5 sentences, or short bullet points
+   for lists.
+7. Do not add farewells or suggestions to contact the crew.
+8. Use "cruising altitude" and "cruising speed" for altitude and speed.
+
+CONTEXT:
+{context}
+
+Question: {question}
+Answer:"""
 
 
 def build_prompt(user_message: str, db: Session) -> str:
     flight_block = build_flight_block(db)
     knowledge_block = build_knowledge_block(user_message)
 
-    blocks = [b for b in (flight_block, knowledge_block) if b]
+    blocks = [b for b in (knowledge_block, flight_block) if b]
     context = "\n\n".join(blocks) if blocks else "(контекст отсутствует)"
 
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context)
-    return f"{system_prompt}\n\nВопрос пассажира: {user_message}"
+    lang = detect_language(user_message)
+    template = SYSTEM_PROMPT_EN if lang == "en" else SYSTEM_PROMPT_RU
+    logger.info("Detected language: %s", lang)
+    return template.format(context=context, question=user_message)
 
 
 # Вызов Ollama
@@ -161,7 +226,7 @@ async def call_llm(prompt: str) -> str:
                     "model": OLLAMA_MODEL,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.2, "top_p": 0.9},
+                    "options": {"temperature": 0.1, "top_p": 0.9},
                 },
             )
             result.raise_for_status()
@@ -202,6 +267,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     logger.info("Запрос: %s", request.message[:120])
 
     prompt = build_prompt(request.message, db)
+
     answer = await call_llm(prompt)
 
     return ChatResponse(response=answer)
