@@ -10,3 +10,5 @@ data/chunks.pkl
 data/skyassist.db
 data/snapshots/
 data/knowledge_base
+tests/baseline_metrics.json
+tests/evaluation_set.jsonl

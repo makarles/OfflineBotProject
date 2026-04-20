@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.database import get_db, init_db
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
-from backend.rag.retriever import retrieve
+from backend.rag.hybrid_retriever import retrieve
 
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -117,12 +117,15 @@ def build_knowledge_block(query: str) -> str:
     if not chunks:
         return ""
 
-    MIN_TOP_SCORE = 0.60
-    top_score = chunks[0].get("score", 0.0)
-    if top_score < MIN_TOP_SCORE:
+    MIN_DENSE_SCORE = 0.55
+    MIN_BM25_SCORE = 3.0
+    top = chunks[0]
+    top_dense = top.get("score", 0.0) or 0.0
+    top_bm25 = top.get("bm25_score", 0.0) or 0.0
+    if top_dense < MIN_DENSE_SCORE and top_bm25 < MIN_BM25_SCORE:
         logger.info(
-            "KNOWLEDGE dropped: top score %.3f < %.2f (no relevant chunks)",
-            top_score, MIN_TOP_SCORE
+            "KNOWLEDGE dropped: top dense=%.3f bm25=%.2f below thresholds (%.2f / %.1f)",
+            top_dense, top_bm25, MIN_DENSE_SCORE, MIN_BM25_SCORE
         )
         return ""
 
