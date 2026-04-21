@@ -26,7 +26,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 # Конфиг RAG
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "12"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "6"))
 RAG_CONTEXT_CHUNKS = int(os.getenv("RAG_CONTEXT_CHUNKS", "10"))
 
 
@@ -106,19 +106,11 @@ def build_flight_block(db: Session) -> str:
 def build_knowledge_block(query: str) -> str:
     chunks = retrieve(query, top_k=RAG_TOP_K)
 
-    # ОТЛАДКА
-    logger.info("RAG query: %r", query)
-    for i, c in enumerate(chunks[:8]):
-        logger.info("  [%d] score=%.3f city=%s section=%s text=%s",
-                    i, c.get("score", 0), c.get("city", "?"),
-                    c.get("section", "?"), c.get("text", "")[:100])
-    # /ОТЛАДКА
-
     if not chunks:
         return ""
 
     MIN_DENSE_SCORE = 0.55
-    MIN_BM25_SCORE = 3.0
+    MIN_BM25_SCORE = 5.0
     top = chunks[0]
     top_dense = top.get("score", 0.0) or 0.0
     top_bm25 = top.get("bm25_score", 0.0) or 0.0
