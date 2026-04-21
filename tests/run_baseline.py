@@ -81,8 +81,8 @@ def is_refusal(answer: str, language: str) -> bool:
     return short and has_marker
 
 
-def call_chat_api(message: str, language: str) -> tuple[str | None, float | None, str | None]:
-    payload = {"message": message, "language": language}
+def call_chat_api(message: str) -> tuple[str | None, float | None, str | None]:
+    payload = {"message": message}
     attempts = 2 if RETRY_ONCE else 1
 
     for attempt in range(attempts):
@@ -210,7 +210,7 @@ def compute_metrics(results: list[TestResult]) -> dict[str, Any]:
 # Обработка одного вопроса
 
 def process_question(q: dict[str, Any]) -> TestResult:
-    answer, latency, error = call_chat_api(q["question"], q["language"])
+    answer, latency, error = call_chat_api(q["question"])
     answer = answer or ""
 
     answer_language = detect_response_language(answer)

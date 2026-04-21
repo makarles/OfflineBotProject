@@ -45,7 +45,6 @@ app = FastAPI(title="SkyAssist API", lifespan=lifespan)
 # Схемы запроса/ответа
 class ChatRequest(BaseModel):
     message: str
-    language: str = "ru"
 
 
 class ChatResponse(BaseModel):
