@@ -19,7 +19,7 @@ SAVE_EVERY = 10       # сохранять промежуточные резул
 RETRY_ONCE = True     # одна попытка повтора при сетевой ошибке
 
 TESTS_DIR = Path(__file__).parent
-DEFAULT_INPUT = TESTS_DIR / "evaluation_set.jsonl"
+DEFAULT_INPUT = TESTS_DIR / "evaluation_set_5cities.jsonl"
 DEFAULT_OUTPUT = TESTS_DIR / "baseline_metrics.json"
 
 # Логирование
