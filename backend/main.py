@@ -11,6 +11,7 @@ from backend.db.database import get_db, init_db
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
 from backend.rag.hybrid_retriever import retrieve
 from backend.rag.reranker import rerank
+from backend.rag.city_filter import filter_by_city
 
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -104,23 +105,50 @@ def build_flight_block(db: Session) -> str:
 
 # Сборка блока KNOWLEDGE из RAG
 def build_knowledge_block(query: str) -> str:
+    # Hybrid берёт 20 кандидатов
     candidates = retrieve(query, top_k=20)
 
     if not candidates:
         return ""
 
+    # Фильтр по упомянутому в запросе городу
+    # Если город упомянут — отфильтруем чанки других городов
+    # Это не дает модели смешивать данные про Москву и Владивосток
+    candidates = filter_by_city(query, candidates)
+
+    if not candidates:
+        # После фильтра не осталось релевантных чанков
+        logger.info("KNOWLEDGE dropped: no chunks for mentioned city")
+        return ""
+
+    # Reranker пересортирует отфильтрованные
     chunks = rerank(query, candidates, top_k=RAG_CONTEXT_CHUNKS)
 
+    # Фильтр по reranker score (как было)
     MIN_RERANK_SCORE = 0.30
     top_score = chunks[0].get("rerank_score", 0.0)
     if top_score < MIN_RERANK_SCORE:
         logger.info(
-            "KNOWLEDGE dropped: top rerank_score=%.3f < %.2f (no relevant chunks)",
+            "KNOWLEDGE dropped: top rerank_score=%.3f < %.2f",
             top_score, MIN_RERANK_SCORE
         )
         return ""
 
-    lines = ["KNOWLEDGE (справочная информация)"]
+    # то, что пошло в KNOWLEDGE
+    logger.info("=== KNOWLEDGE top-%d chunks ===", len(chunks))
+    for i, chunk in enumerate(chunks):
+        text_preview = chunk.get("text", "")[:200].replace("\n", " ")
+        logger.info(
+            "  top[%d] rerank=%.3f city=%s section=%s | %s",
+            i,
+            chunk.get("rerank_score", 0.0),
+            chunk.get("city", "-") or "-",
+            chunk.get("section", "-"),
+            text_preview,
+        )
+
+    # Сборка блока (без изменений)
+    lines = ["=== KNOWLEDGE (справочная информация) ==="]
     for chunk in chunks:
         title = chunk.get("title", "")
         text = chunk.get("text", "")
