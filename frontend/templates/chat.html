@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyAssist — бортовой ассистент AeroLine</title>
+    <link rel="stylesheet" href="/static/chat.css">
+    <!-- marked.js для рендеринга markdown в ответах ассистента -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- Левая панель: список разговоров -->
+    <aside class="sidebar">
+        <button class="new-chat-btn" id="newChatBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Новый чат
+        </button>
+
+        <div class="sessions-list" id="sessionsList">
+            <!-- Сессии загружаются JS -->
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="logo">SkyAssist</div>
+            <div class="subtitle">AeroLine</div>
+        </div>
+    </aside>
+
+    <!-- Правая часть: сообщения и ввод -->
+    <main class="main">
+
+        <!-- Шапка с заголовком текущей сессии -->
+        <header class="main-header">
+            <h1 class="session-title" id="sessionTitle">Новый чат</h1>
+        </header>
+
+        <!-- Лента сообщений -->
+        <div class="messages" id="messages">
+            <!-- Сообщения добавляются JS -->
+            <div class="welcome" id="welcome">
+                <h2>Здравствуйте 👋</h2>
+                <p>Я бортовой ассистент AeroLine. Спросите меня о текущем рейсе, городах назначения или о правилах перевозки.</p>
+                <div class="suggestions">
+                    <button class="suggestion" data-prompt="Какой у нас рейс?">Какой у нас рейс?</button>
+                    <button class="suggestion" data-prompt="Что посмотреть в Дубае?">Что посмотреть в Дубае?</button>
+                    <button class="suggestion" data-prompt="Какая валюта в Турции?">Какая валюта в Турции?</button>
+                    <button class="suggestion" data-prompt="Какие нормы багажа?">Какие нормы багажа?</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Поле ввода -->
+        <div class="composer">
+            <div class="composer-inner">
+                <textarea
+                    id="messageInput"
+                    placeholder="Спросите что-нибудь..."
+                    rows="1"
+                    maxlength="5000"
+                ></textarea>
+                <button class="send-btn" id="sendBtn" disabled>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="hint">Enter — отправить, Shift+Enter — новая строка</div>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- Модальное окно для переименования -->
+<div class="modal-overlay" id="renameModal" hidden>
+    <div class="modal">
+        <h3>Переименовать чат</h3>
+        <input type="text" id="renameInput" maxlength="200">
+        <div class="modal-actions">
+            <button class="btn-secondary" id="renameCancel">Отмена</button>
+            <button class="btn-primary" id="renameConfirm">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/chat.js"></script>
+</body>
+</html>

@@ -3,15 +3,20 @@ import os
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend import chat_db
+from backend.api import chat as chat_api
 from backend.db.database import get_db, init_db
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
+from backend.rag.city_filter import filter_by_city
 from backend.rag.hybrid_retriever import retrieve
 from backend.rag.reranker import rerank
-from backend.rag.city_filter import filter_by_city
 
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -36,6 +41,7 @@ RAG_CONTEXT_CHUNKS = int(os.getenv("RAG_CONTEXT_CHUNKS", "10"))
 async def lifespan(app: FastAPI):
     logger.info("Инициализация базы данных...")
     init_db()
+    chat_db.init_db()
     logger.info("SkyAssist готов к работе")
     yield
     logger.info("SkyAssist останавливается")
@@ -105,26 +111,19 @@ def build_flight_block(db: Session) -> str:
 
 # Сборка блока KNOWLEDGE из RAG
 def build_knowledge_block(query: str) -> str:
-    # Hybrid берёт 20 кандидатов
     candidates = retrieve(query, top_k=20)
 
     if not candidates:
         return ""
 
-    # Фильтр по упомянутому в запросе городу
-    # Если город упомянут — отфильтруем чанки других городов
-    # Это не дает модели смешивать данные про Москву и Владивосток
     candidates = filter_by_city(query, candidates)
 
     if not candidates:
-        # После фильтра не осталось релевантных чанков
         logger.info("KNOWLEDGE dropped: no chunks for mentioned city")
         return ""
 
-    # Reranker пересортирует отфильтрованные
     chunks = rerank(query, candidates, top_k=RAG_CONTEXT_CHUNKS)
 
-    # Фильтр по reranker score (как было)
     MIN_RERANK_SCORE = 0.30
     top_score = chunks[0].get("rerank_score", 0.0)
     if top_score < MIN_RERANK_SCORE:
@@ -134,7 +133,6 @@ def build_knowledge_block(query: str) -> str:
         )
         return ""
 
-    # то, что пошло в KNOWLEDGE
     logger.info("=== KNOWLEDGE top-%d chunks ===", len(chunks))
     for i, chunk in enumerate(chunks):
         text_preview = chunk.get("text", "")[:200].replace("\n", " ")
@@ -147,7 +145,6 @@ def build_knowledge_block(query: str) -> str:
             text_preview,
         )
 
-    # Сборка блока (без изменений)
     lines = ["=== KNOWLEDGE (справочная информация) ==="]
     for chunk in chunks:
         title = chunk.get("title", "")
@@ -170,7 +167,6 @@ def detect_language(text: str) -> str:
     return "ru" if cyrillic / len(letters) > 0.3 else "en"
 
 
-# Системный промпт RU
 SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиакомпании AeroLine.
 
 ИНСТРУКЦИИ:
@@ -197,7 +193,6 @@ SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиако�
 Ответ:"""
 
 
-# Системный промпт EN
 SYSTEM_PROMPT_EN = """You are an in-flight assistant for AeroLine airline.
 
 INSTRUCTIONS:
@@ -268,10 +263,24 @@ async def call_llm(prompt: str) -> str:
         )
 
 
+async def process_message(message: str, db: Session) -> str:
+    prompt = build_prompt(message, db)
+    return await call_llm(prompt)
+
+
+chat_api.register_processor(process_message)
+
+app.include_router(chat_api.router)
+
+# Статика (CSS, JS) и шаблоны (HTML) для UI
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+templates = Jinja2Templates(directory="frontend/templates")
+
+
 # Эндпоинты
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": "SkyAssist"}
+@app.get("/", response_class=HTMLResponse)
+async def chat_ui(request: Request):
+    return templates.TemplateResponse(request, "chat.html")
 
 
 @app.get("/health")
@@ -287,9 +296,5 @@ async def health(db: Session = Depends(get_db)):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     logger.info("Запрос: %s", request.message[:120])
-
-    prompt = build_prompt(request.message, db)
-
-    answer = await call_llm(prompt)
-
+    answer = await process_message(request.message, db)
     return ChatResponse(response=answer)
