@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyAssist — админ-панель</title>
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+
+<header class="admin-header">
+    <div class="header-inner">
+        <div class="brand">
+            <h1>SkyAssist <span class="muted">/ Админ-панель</span></h1>
+            <div class="subtitle">AeroLine — управление данными рейса</div>
+        </div>
+        <a href="/" class="back-link">← К чату</a>
+    </div>
+</header>
+
+<nav class="tabs">
+    <div class="tabs-inner">
+        <button class="tab active" data-tab="flight">Рейс</button>
+        <button class="tab" data-tab="aircraft">Борты</button>
+        <button class="tab" data-tab="routes">Маршруты</button>
+    </div>
+</nav>
+
+<main class="content">
+
+    <!-- ============== Вкладка: РЕЙС ============== -->
+    <section class="tab-panel active" id="panel-flight">
+
+        <div class="panel-header">
+            <h2>Текущий рейс</h2>
+            <p class="hint">Заполните форму и нажмите «Сохранить» — данные будут применены сразу.</p>
+        </div>
+
+        <form id="flight-form" novalidate>
+
+            <!-- Основные данные -->
+            <fieldset class="card">
+                <legend>Основная информация</legend>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="flight_number">Номер рейса <span class="req">*</span></label>
+                        <input type="text" id="flight_number" name="flight_number" placeholder="AL-1234" required maxlength="20">
+                    </div>
+
+                    <div class="field">
+                        <label for="route_id">Маршрут <span class="req">*</span></label>
+                        <select id="route_id" name="route_id" required></select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="departure_time">Вылет <span class="req">*</span></label>
+                        <input type="text" id="departure_time" name="departure_time" placeholder="2026-04-26 10:30" required maxlength="50">
+                    </div>
+
+                    <div class="field">
+                        <label for="arrival_time">Прибытие <span class="req">*</span></label>
+                        <input type="text" id="arrival_time" name="arrival_time" placeholder="2026-04-26 16:45" required maxlength="50">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="aircraft_id">Борт <span class="req">*</span></label>
+                        <select id="aircraft_id" name="aircraft_id" required></select>
+                    </div>
+
+                    <div class="field">
+                        <label for="meal_type">Тип питания <span class="req">*</span></label>
+                        <select id="meal_type" name="meal_type" required>
+                            <option value="full">Полное (горячее, гарнир, десерт)</option>
+                            <option value="light">Лёгкий перекус (сэндвич, напитки)</option>
+                            <option value="snack_only">Только напитки и снэки</option>
+                            <option value="no_meal">Без питания</option>
+                        </select>
+                        <div class="field-hint" id="meal-type-hint"></div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="cruising_altitude">Крейсерская высота, м</label>
+                        <input type="number" id="cruising_altitude" name="cruising_altitude" placeholder="10500">
+                    </div>
+
+                    <div class="field">
+                        <label for="cruising_speed">Крейсерская скорость, км/ч</label>
+                        <input type="number" id="cruising_speed" name="cruising_speed" placeholder="850">
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Обратный рейс -->
+            <fieldset class="card">
+                <legend>Обратный рейс <span class="optional">(опционально)</span></legend>
+
+                <div class="grid-3">
+                    <div class="field">
+                        <label for="return_flight_number">Номер</label>
+                        <input type="text" id="return_flight_number" name="return_flight_number" placeholder="AL-1235" maxlength="20">
+                    </div>
+
+                    <div class="field">
+                        <label for="return_departure_time">Вылет обратно</label>
+                        <input type="text" id="return_departure_time" name="return_departure_time" placeholder="2026-04-26 18:30" maxlength="50">
+                    </div>
+
+                    <div class="field">
+                        <label for="return_arrival_time">Прибытие обратно</label>
+                        <input type="text" id="return_arrival_time" name="return_arrival_time" placeholder="2026-04-26 23:45" maxlength="50">
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Погода -->
+            <fieldset class="card">
+                <legend>Погода в пункте назначения</legend>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="weather_description_ru">Описание (RU)</label>
+                        <input type="text" id="weather_description_ru" name="weather_description_ru" placeholder="Солнечно, ветер слабый" maxlength="200">
+                    </div>
+
+                    <div class="field">
+                        <label for="weather_description_en">Описание (EN)</label>
+                        <input type="text" id="weather_description_en" name="weather_description_en" placeholder="Sunny, light wind" maxlength="200">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="weather_temp_celsius">Температура, °C</label>
+                    <input type="number" id="weather_temp_celsius" name="weather_temp_celsius" placeholder="28" class="narrow">
+                </div>
+            </fieldset>
+
+            <!-- Курс валюты -->
+            <fieldset class="card">
+                <legend>Курс валюты</legend>
+
+                <div class="grid-3">
+                    <div class="field">
+                        <label for="exchange_rate_currency">Валюта</label>
+                        <input type="text" id="exchange_rate_currency" name="exchange_rate_currency" placeholder="AED" maxlength="10">
+                    </div>
+
+                    <div class="field">
+                        <label for="exchange_rate_to_rub">Курс к рублю</label>
+                        <input type="number" step="0.01" id="exchange_rate_to_rub" name="exchange_rate_to_rub" placeholder="25.30">
+                    </div>
+
+                    <div class="field">
+                        <!-- placeholder, чтобы grid-3 не ломался -->
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="exchange_rate_note_ru">Подпись (RU)</label>
+                        <input type="text" id="exchange_rate_note_ru" name="exchange_rate_note_ru" placeholder="1 AED = 25.30 ₽" maxlength="100">
+                    </div>
+
+                    <div class="field">
+                        <label for="exchange_rate_note_en">Подпись (EN)</label>
+                        <input type="text" id="exchange_rate_note_en" name="exchange_rate_note_en" placeholder="1 AED = 25.30 RUB" maxlength="100">
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Меню эконом -->
+            <fieldset class="card">
+                <legend>Меню эконом-класса</legend>
+                <div class="menu-list" id="menu-economy"></div>
+                <button type="button" class="btn-add" data-class="economy">+ Добавить блюдо</button>
+            </fieldset>
+
+            <!-- Меню бизнес -->
+            <fieldset class="card">
+                <legend>Меню бизнес-класса</legend>
+                <div class="menu-list" id="menu-business"></div>
+                <button type="button" class="btn-add" data-class="business">+ Добавить блюдо</button>
+            </fieldset>
+
+            <!-- Коммерческие предложения -->
+            <fieldset class="card">
+                <legend>Коммерческие предложения <span class="optional">(опционально)</span></legend>
+                <div class="offers-list" id="offers-list"></div>
+                <button type="button" class="btn-add" id="btn-add-offer">+ Добавить предложение</button>
+            </fieldset>
+
+            <!-- Submit -->
+            <div class="form-actions">
+                <button type="submit" class="btn-primary" id="save-flight-btn">Сохранить и применить</button>
+                <button type="button" class="btn-secondary" id="reload-flight-btn">Сбросить изменения</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- ============== Вкладка: БОРТЫ ============== -->
+    <section class="tab-panel" id="panel-aircraft">
+        <div class="panel-header">
+            <h2>Справочник бортов</h2>
+            <p class="hint">Борт нельзя удалить, если он используется в текущем рейсе.</p>
+        </div>
+
+        <div class="card">
+            <div class="table-toolbar">
+                <button class="btn-primary" id="btn-add-aircraft">+ Добавить борт</button>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Регистрация</th>
+                    <th>Тип</th>
+                    <th>Производитель</th>
+                    <th>Эконом</th>
+                    <th>Бизнес</th>
+                    <th>Год</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="aircraft-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ============== Вкладка: МАРШРУТЫ ============== -->
+    <section class="tab-panel" id="panel-routes">
+        <div class="panel-header">
+            <h2>Справочник маршрутов</h2>
+            <p class="hint">Маршрут нельзя удалить, если он используется в текущем рейсе.</p>
+        </div>
+
+        <div class="card">
+            <div class="table-toolbar">
+                <button class="btn-primary" id="btn-add-route">+ Добавить маршрут</button>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Откуда</th>
+                    <th>Куда</th>
+                    <th>Тип</th>
+                    <th>Время, мин</th>
+                    <th>Расстояние, км</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="routes-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<!-- Контейнер для toast-уведомлений -->
+<div class="toasts" id="toasts"></div>
+
+<!-- Модалка для добавления/редактирования борта -->
+<div class="modal-overlay" id="aircraft-modal" hidden>
+    <div class="modal">
+        <h3 id="aircraft-modal-title">Добавить борт</h3>
+        <form id="aircraft-form">
+            <input type="hidden" id="aircraft-id">
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Регистрация <span class="req">*</span></label>
+                    <input type="text" id="ac-registration" required maxlength="20" placeholder="RA-89012">
+                </div>
+                <div class="field">
+                    <label>Тип <span class="req">*</span></label>
+                    <input type="text" id="ac-aircraft_type" required maxlength="50" placeholder="Airbus A320">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Производитель</label>
+                    <input type="text" id="ac-manufacturer" maxlength="50" placeholder="Airbus">
+                </div>
+                <div class="field">
+                    <label>Год</label>
+                    <input type="number" id="ac-year_manufactured" placeholder="2018">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Эконом-кресел</label>
+                    <input type="number" id="ac-capacity_economy" placeholder="150">
+                </div>
+                <div class="field">
+                    <label>Бизнес-кресел</label>
+                    <input type="number" id="ac-capacity_business" placeholder="12">
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Статус</label>
+                <select id="ac-status">
+                    <option value="active">Активный</option>
+                    <option value="maintenance">На обслуживании</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="aircraft-cancel">Отмена</button>
+                <button type="submit" class="btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модалка для добавления/редактирования маршрута -->
+<div class="modal-overlay" id="route-modal" hidden>
+    <div class="modal">
+        <h3 id="route-modal-title">Добавить маршрут</h3>
+        <form id="route-form">
+            <input type="hidden" id="route-id">
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Город вылета <span class="req">*</span></label>
+                    <input type="text" id="rt-origin_city" required placeholder="Москва">
+                </div>
+                <div class="field">
+                    <label>IATA вылета <span class="req">*</span></label>
+                    <input type="text" id="rt-origin_iata" required minlength="3" maxlength="4" placeholder="SVO">
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Страна вылета</label>
+                <input type="text" id="rt-origin_country" placeholder="Россия">
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Город прилёта <span class="req">*</span></label>
+                    <input type="text" id="rt-destination_city" required placeholder="Дубай">
+                </div>
+                <div class="field">
+                    <label>IATA прилёта <span class="req">*</span></label>
+                    <input type="text" id="rt-destination_iata" required minlength="3" maxlength="4" placeholder="DXB">
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Страна прилёта</label>
+                <input type="text" id="rt-destination_country" placeholder="ОАЭ">
+            </div>
+
+            <div class="grid-3">
+                <div class="field">
+                    <label>Время, мин</label>
+                    <input type="number" id="rt-flight_duration_min" placeholder="315">
+                </div>
+                <div class="field">
+                    <label>Расстояние, км</label>
+                    <input type="number" id="rt-distance_km" placeholder="3500">
+                </div>
+                <div class="field checkbox-field">
+                    <label>
+                        <input type="checkbox" id="rt-is_domestic">
+                        Внутренний рейс
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="route-cancel">Отмена</button>
+                <button type="submit" class="btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend import chat_db
 from backend.api import chat as chat_api
+from backend.api import admin as admin_api
 from backend.db.database import get_db, init_db
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
 from backend.rag.city_filter import filter_by_city
@@ -133,7 +134,7 @@ def build_knowledge_block(query: str) -> str:
         )
         return ""
 
-    logger.info("=== KNOWLEDGE top-%d chunks ===", len(chunks))
+    logger.info("KNOWLEDGE top-%d chunks", len(chunks))
     for i, chunk in enumerate(chunks):
         text_preview = chunk.get("text", "")[:200].replace("\n", " ")
         logger.info(
@@ -145,7 +146,7 @@ def build_knowledge_block(query: str) -> str:
             text_preview,
         )
 
-    lines = ["=== KNOWLEDGE (справочная информация) ==="]
+    lines = ["KNOWLEDGE (справочная информация)"]
     for chunk in chunks:
         title = chunk.get("title", "")
         text = chunk.get("text", "")
@@ -185,7 +186,10 @@ SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиако�
    короткие маркеры для списков.
 7. Не добавляй прощальных фраз и предложений обратиться к экипажу.
 8. Высоту указывай как «крейсерская высота», скорость — «крейсерская скорость».
-
+9. Для вопросов о ТЕКУЩЕЙ погоде, температуре, курсе валют — используй ТОЛЬКО блок FLIGHT.
+   В блоке KNOWLEDGE содержатся общеклиматические сведения по сезонам — не используй
+   их как ответ на вопрос «какая погода сейчас» или «сколько градусов».
+   
 КОНТЕКСТ:
 {context}
 
@@ -212,7 +216,11 @@ INSTRUCTIONS:
    for lists.
 7. Do not add farewells or suggestions to contact the crew.
 8. Use "cruising altitude" and "cruising speed" for altitude and speed.
-
+9. For questions about CURRENT weather, temperature, or exchange rates — use 
+   ONLY the FLIGHT block. The KNOWLEDGE block contains seasonal climate 
+   information and general currency facts — these are NOT answers to questions 
+   like "what's the weather now" or "how many degrees".
+   
 CONTEXT:
 {context}
 
@@ -276,6 +284,8 @@ app.include_router(chat_api.router)
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 templates = Jinja2Templates(directory="frontend/templates")
 
+app.include_router(admin_api.router)
+
 
 # Эндпоинты
 @app.get("/", response_class=HTMLResponse)
@@ -298,3 +308,9 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     logger.info("Запрос: %s", request.message[:120])
     answer = await process_message(request.message, db)
     return ChatResponse(response=answer)
+
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+async def admin_ui(request: Request):
+    return templates.TemplateResponse(request, "admin.html")

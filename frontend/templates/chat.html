@@ -44,15 +44,30 @@
         <div class="messages" id="messages">
             <!-- Сообщения добавляются JS -->
             <div class="welcome" id="welcome">
-                <h2>Здравствуйте 👋</h2>
-                <p>Я бортовой ассистент AeroLine. Спросите меня о текущем рейсе, городах назначения или о правилах перевозки.</p>
-                <div class="suggestions">
-                    <button class="suggestion" data-prompt="Какой у нас рейс?">Какой у нас рейс?</button>
-                    <button class="suggestion" data-prompt="Что посмотреть в Дубае?">Что посмотреть в Дубае?</button>
-                    <button class="suggestion" data-prompt="Какая валюта в Турции?">Какая валюта в Турции?</button>
-                    <button class="suggestion" data-prompt="Какие нормы багажа?">Какие нормы багажа?</button>
-                </div>
+    <div class="message assistant welcome-message">
+        <div class="message-avatar">AL</div>
+        <div class="message-content">
+            <div class="message-role">SkyAssist</div>
+            <div class="message-text">
+                <p>Здравствуйте! </p>
+                <p>Я <strong>SkyAssist</strong> — интеллектуальный ассистент авиакомпании <strong>AeroLine</strong>. Я могу ответить на ваши вопросы:</p>
+                <ul>
+                    <li>о вашем текущем рейсе и меню на борту</li>
+                    <li>о правилах и услугах AeroLine</li>
+                    <li>о городе назначения и других направлениях нашей маршрутной сети</li>
+                </ul>
+                <p>Я могу ошибаться — пожалуйста, проверяйте важную информацию у бортпроводника или в официальных источниках.</p>
             </div>
+        </div>
+    </div>
+
+    <div class="suggestions">
+        <button class="suggestion" data-prompt="Какой у нас рейс?">Какой у нас рейс?</button>
+        <button class="suggestion" data-prompt="Что посмотреть в Дубае?">Что посмотреть в Дубае?</button>
+        <button class="suggestion" data-prompt="Какая валюта в Турции?">Какая валюта в Турции?</button>
+        <button class="suggestion" data-prompt="Какие нормы багажа?">Какие нормы багажа?</button>
+    </div>
+</div>
         </div>
 
         <!-- Поле ввода -->

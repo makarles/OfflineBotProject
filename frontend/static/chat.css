@@ -207,29 +207,22 @@ body {
     padding: 24px;
 }
 
+/* ===== Welcome-блок: первое сообщение ассистента + подсказки ===== */
+
 .welcome {
     max-width: var(--max-content-width);
-    margin: 60px auto;
-    text-align: center;
+    margin: 40px auto;
 }
 
-.welcome h2 {
-    font-size: 28px;
-    font-weight: 600;
-    margin-bottom: 12px;
-}
-
-.welcome p {
-    color: var(--color-text-muted);
+.welcome-message {
     margin-bottom: 32px;
 }
 
-.suggestions {
+.welcome .suggestions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    max-width: 540px;
-    margin: 0 auto;
+    margin-left: 46px;  /* выравниваем по тексту сообщения, не по аватару */
 }
 
 .suggestion {
