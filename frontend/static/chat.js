@@ -164,11 +164,171 @@ async function deleteSession(sessionId, title) {
 function renderMessages(messages) {
     messagesEl.innerHTML = '';
     welcomeEl.style.display = 'none';
-    messages.forEach(m => appendMessage(m.role, m.content));
+
+    messages.forEach(message => appendMessage(message));
+
     scrollToBottom();
 }
 
-function appendMessage(role, content) {
+function formatMessageTime(value) {
+    if (!value) return '';
+
+    let normalizedValue = String(value).trim();
+
+    const hasTimezone =
+        normalizedValue.endsWith('Z') ||
+        /[+-]\d{2}:\d{2}$/.test(normalizedValue);
+
+    if (!hasTimezone && normalizedValue.includes('T')) {
+        normalizedValue += 'Z';
+    }
+
+    const date = new Date(normalizedValue);
+
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    return date.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+function applyFeedbackState(actionsEl, feedback) {
+    const normalizedFeedback = feedback || '';
+
+    actionsEl.dataset.feedback = normalizedFeedback;
+    actionsEl.classList.toggle('has-selected-feedback', Boolean(normalizedFeedback));
+
+    const statusEl = actionsEl.querySelector('.feedback-status');
+
+    actionsEl.querySelectorAll('.feedback-btn').forEach(btn => {
+        const isActive = btn.dataset.feedback === normalizedFeedback;
+        btn.classList.toggle('active', isActive);
+
+        if (btn.dataset.feedback === 'like') {
+            btn.title = isActive ? 'Лайк поставлен. Нажмите ещё раз, чтобы снять' : 'Хороший ответ';
+        }
+
+        if (btn.dataset.feedback === 'dislike') {
+            btn.title = isActive ? 'Дизлайк поставлен. Нажмите ещё раз, чтобы снять' : 'Плохой ответ';
+        }
+    });
+
+    if (statusEl) {
+        if (normalizedFeedback === 'like') {
+            statusEl.textContent = 'Оценка сохранена: ответ понравился';
+        } else if (normalizedFeedback === 'dislike') {
+            statusEl.textContent = 'Оценка сохранена: ответ не понравился';
+        } else {
+            statusEl.textContent = '';
+        }
+    }
+}
+
+async function setAssistantFeedback(messageId, currentFeedback, nextFeedback, actionsEl) {
+    if (!currentSessionId || !messageId) return;
+
+    const feedbackToSave = currentFeedback === nextFeedback ? null : nextFeedback;
+
+    actionsEl.querySelectorAll('button').forEach(btn => {
+        btn.disabled = true;
+    });
+
+    try {
+        const updatedMessage = await api(
+            'PATCH',
+            `/api/sessions/${currentSessionId}/messages/${messageId}/feedback`,
+            { feedback: feedbackToSave }
+        );
+
+        applyFeedbackState(actionsEl, updatedMessage.feedback);
+    } catch (err) {
+        console.error('Ошибка сохранения feedback:', err);
+        alert('Не удалось сохранить оценку ответа: ' + err.message);
+    } finally {
+        actionsEl.querySelectorAll('button').forEach(btn => {
+            btn.disabled = false;
+        });
+    }
+}
+
+function createAssistantFeedbackActions(message) {
+    if (!message.id) return null;
+
+    const actions = document.createElement('div');
+    actions.className = 'message-feedback';
+
+    const likeBtn = document.createElement('button');
+    likeBtn.className = 'feedback-btn';
+    likeBtn.type = 'button';
+    likeBtn.dataset.feedback = 'like';
+    likeBtn.setAttribute('aria-label', 'Поставить лайк ответу');
+    likeBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+            <path d="M7 11l4-8a3 3 0 0 1 3 3v5h4.5a2 2 0 0 1 2 2.3l-1.1 6A2 2 0 0 1 17.4 21H7V11z"></path>
+        </svg>
+    `;
+
+    const dislikeBtn = document.createElement('button');
+    dislikeBtn.className = 'feedback-btn';
+    dislikeBtn.type = 'button';
+    dislikeBtn.dataset.feedback = 'dislike';
+    dislikeBtn.setAttribute('aria-label', 'Поставить дизлайк ответу');
+    dislikeBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+            <path d="M17 13l-4 8a3 3 0 0 1-3-3v-5H5.5a2 2 0 0 1-2-2.3l1.1-6A2 2 0 0 1 6.6 3H17v10z"></path>
+        </svg>
+    `;
+
+    const status = document.createElement('span');
+    status.className = 'feedback-status';
+
+    likeBtn.addEventListener('click', () => {
+        setAssistantFeedback(
+            message.id,
+            actions.dataset.feedback || null,
+            'like',
+            actions
+        );
+    });
+
+    dislikeBtn.addEventListener('click', () => {
+        setAssistantFeedback(
+            message.id,
+            actions.dataset.feedback || null,
+            'dislike',
+            actions
+        );
+    });
+
+    actions.appendChild(likeBtn);
+    actions.appendChild(dislikeBtn);
+    actions.appendChild(status);
+
+    applyFeedbackState(actions, message.feedback);
+
+    return actions;
+}
+
+function appendMessage(messageOrRole, content = null) {
+    const message = typeof messageOrRole === 'object'
+        ? messageOrRole
+        : {
+            role: messageOrRole,
+            content,
+            created_at: new Date().toISOString(),
+            feedback: null,
+        };
+
+    const role = message.role;
+
     welcomeEl.style.display = 'none';
 
     const msg = document.createElement('div');
@@ -181,22 +341,47 @@ function appendMessage(role, content) {
     const wrap = document.createElement('div');
     wrap.className = 'message-content';
 
+    const metaEl = document.createElement('div');
+    metaEl.className = 'message-meta';
+
     const roleEl = document.createElement('div');
     roleEl.className = 'message-role';
     roleEl.textContent = role === 'user' ? 'Вы' : 'SkyAssist';
 
-    const textEl = document.createElement('div');
-    textEl.className = 'message-text';
-    if (role === 'assistant') {
-        // Markdown с защитой от XSS — отключаем HTML, разрешаем только основной markdown
-        textEl.innerHTML = marked.parse(content, { breaks: true, gfm: true });
-    } else {
-        // Пользовательские сообщения — просто текст с переносами
-        textEl.textContent = content;
+    const timeEl = document.createElement('time');
+    timeEl.className = 'message-time';
+    timeEl.dateTime = message.created_at || '';
+    timeEl.textContent = formatMessageTime(message.created_at);
+
+    metaEl.appendChild(roleEl);
+
+    if (timeEl.textContent) {
+        metaEl.appendChild(timeEl);
     }
 
-    wrap.appendChild(roleEl);
+    const textEl = document.createElement('div');
+    textEl.className = 'message-text';
+
+    if (role === 'assistant') {
+        textEl.innerHTML = marked.parse(message.content, {
+            breaks: true,
+            gfm: true,
+        });
+    } else {
+        textEl.textContent = message.content;
+    }
+
+    wrap.appendChild(metaEl);
     wrap.appendChild(textEl);
+
+    const feedbackActions = role === 'assistant'
+        ? createAssistantFeedbackActions(message)
+        : null;
+
+    if (feedbackActions) {
+        wrap.appendChild(feedbackActions);
+    }
+
     msg.appendChild(avatar);
     msg.appendChild(wrap);
 
@@ -269,7 +454,7 @@ async function sendMessage() {
     }
 
     // Показываем сообщение пользователя сразу (оптимистичный UI)
-    appendMessage('user', text);
+    appendMessage({ role: 'user', content: text, created_at: new Date().toISOString() });
     messageInput.value = '';
     autoResizeInput();
     appendTypingIndicator();
@@ -282,7 +467,7 @@ async function sendMessage() {
         );
 
         removeTypingIndicator();
-        appendMessage('assistant', result.assistant_message.content);
+        appendMessage(result.assistant_message);
 
         // Обновляем title в шапке (мог измениться после первого сообщения)
         sessionTitleEl.textContent = result.session.title;
@@ -292,7 +477,7 @@ async function sendMessage() {
     } catch (err) {
         removeTypingIndicator();
         console.error('Ошибка отправки:', err);
-        appendMessage('assistant', `⚠️ Ошибка: ${err.message}`);
+        appendMessage({ role: 'assistant', content: `⚠️ Ошибка: ${err.message}`, created_at: new Date().toISOString() });
     } finally {
         isWaitingForResponse = false;
         updateSendButtonState();

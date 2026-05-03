@@ -38,6 +38,7 @@ def init_db() -> None:
                 role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
                 content    TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                feedback   TEXT CHECK (feedback IN ('like', 'dislike') OR feedback IS NULL),
                 FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
             );
 
@@ -48,6 +49,16 @@ def init_db() -> None:
                 ON chat_sessions (updated_at DESC);
             """
         )
+
+        # Миграция для уже существующих chat.db: старые базы не содержат колонку feedback.
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(chat_messages)")}
+        if "feedback" not in columns:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN feedback TEXT CHECK (feedback IN ('like', 'dislike') OR feedback IS NULL)"
+            )
+            logger.info("chat_db: добавлена колонка feedback в chat_messages")
+
     logger.info("chat_db: схема проверена, путь %s", DB_PATH)
 
 
@@ -133,11 +144,34 @@ def add_message(session_id: str, role: str, content: str) -> int:
 def get_messages(session_id: str) -> list[dict[str, Any]]:
     with _get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, role, content, created_at FROM chat_messages "
+            "SELECT id, role, content, created_at, feedback FROM chat_messages "
             "WHERE session_id = ? ORDER BY created_at ASC, id ASC",
             (session_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def set_message_feedback(session_id: str, message_id: int, feedback: str | None) -> dict[str, Any] | None:
+    if feedback not in ("like", "dislike", None):
+        raise ValueError("feedback должен быть 'like', 'dislike' или None")
+
+    with _get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE chat_messages SET feedback = ? "
+            "WHERE id = ? AND session_id = ? AND role = 'assistant'",
+            (feedback, message_id, session_id),
+        )
+        if cursor.rowcount == 0:
+            return None
+        _touch_session(conn, session_id)
+
+        row = conn.execute(
+            "SELECT id, role, content, created_at, feedback FROM chat_messages "
+            "WHERE id = ? AND session_id = ?",
+            (message_id, session_id),
+        ).fetchone()
+
+    return dict(row) if row else None
 
 
 def count_messages(session_id: str) -> int:

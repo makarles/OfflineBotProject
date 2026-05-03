@@ -142,8 +142,11 @@
             </fieldset>
 
             <!-- Курс валюты -->
-            <fieldset class="card">
-                <legend>Курс валюты</legend>
+            <fieldset class="card" id="exchange-rate-card">
+                <legend>Курс валюты <span class="optional">(только для международных рейсов)</span></legend>
+                <div class="field-hint" id="exchange-rate-hint">
+                    Для внутренних рейсов курс валюты можно не заполнять.
+                    </div>
 
                 <div class="grid-3">
                     <div class="field">
@@ -174,19 +177,35 @@
                 </div>
             </fieldset>
 
-            <!-- Меню эконом -->
             <fieldset class="card">
-                <legend>Меню эконом-класса</legend>
-                <div class="menu-list" id="menu-economy"></div>
-                <button type="button" class="btn-add" data-class="economy">+ Добавить блюдо</button>
-            </fieldset>
+    <legend>Питание на борту</legend>
 
-            <!-- Меню бизнес -->
-            <fieldset class="card">
-                <legend>Меню бизнес-класса</legend>
-                <div class="menu-list" id="menu-business"></div>
-                <button type="button" class="btn-add" data-class="business">+ Добавить блюдо</button>
-            </fieldset>
+    <div class="field">
+        <label for="menu_economy_text">Эконом-класс</label>
+        <textarea
+            id="menu_economy_text"
+            name="menu_economy_text"
+            rows="7"
+            placeholder="Например: горячее блюдо, десерт, чай, кофе, вода..."
+        ></textarea>
+        <div class="field-hint">
+            Введите описание питания для пассажиров эконом-класса свободным текстом.
+        </div>
+    </div>
+
+    <div class="field">
+        <label for="menu_business_text">Бизнес-класс</label>
+        <textarea
+            id="menu_business_text"
+            name="menu_business_text"
+            rows="7"
+            placeholder="Например: выбор из трёх горячих блюд, закуски, десерт, напитки..."
+        ></textarea>
+        <div class="field-hint">
+            Введите описание питания для пассажиров бизнес-класса свободным текстом.
+        </div>
+    </div>
+</fieldset>
 
             <!-- Коммерческие предложения -->
             <fieldset class="card">

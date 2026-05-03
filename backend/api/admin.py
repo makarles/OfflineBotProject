@@ -9,13 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.database import get_db
 from backend.db.models import Aircraft, CommercialOffer, Flight, MenuItem, Route
-from backend.db.queries import (
-    get_flight_info,
-    list_aircraft,
-    list_routes,
-    suggest_meal_type,
-    validate_menu_for_meal_type,
-)
+from backend.db.queries import get_flight_info, list_aircraft, list_routes, suggest_meal_type
 
 logger = logging.getLogger("skyassist")
 
@@ -180,20 +174,6 @@ def update_flight_endpoint(
     route = db.query(Route).filter(Route.id == payload.route_id).first()
     if not route:
         raise HTTPException(404, f"Route id={payload.route_id} не найден")
-
-    # Валидация меню по meal_type — отдельно для эконома и бизнеса
-    economy_menu = [m.dict() for m in payload.menu_items if m.cabin_class == "economy"]
-    business_menu = [m.dict() for m in payload.menu_items if m.cabin_class == "business"]
-
-    errors = []
-    errors.extend(validate_menu_for_meal_type(economy_menu, payload.meal_type, "economy"))
-    errors.extend(validate_menu_for_meal_type(business_menu, payload.meal_type, "business"))
-
-    if errors:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "Меню не соответствует типу питания", "errors": errors},
-        )
 
     # Удаляем старые данные (один Flight, его меню и предложения)
     old_flight = db.query(Flight).first()

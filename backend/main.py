@@ -14,8 +14,10 @@ from backend import chat_db
 from backend.api import chat as chat_api
 from backend.api import admin as admin_api
 from backend.db.database import get_db, init_db
+from backend.db.models import CommercialOffer, Flight, MenuItem
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
 from backend.rag.city_filter import filter_by_city
+from backend.rag.route_network import build_route_network_block
 from backend.rag.hybrid_retriever import retrieve
 from backend.rag.reranker import rerank
 
@@ -61,51 +63,120 @@ class ChatResponse(BaseModel):
 
 
 # Сборка блока FLIGHT из SQLite
+def _format_menu_item(item: MenuItem) -> str:
+    name = item.name_ru or item.name_en or "Меню"
+    description = item.description_ru or item.description_en or ""
+    price = "включено в билет" if not item.price else f"{item.price:g} руб."
+
+    if description:
+        return f"- {name}: {description} — {price}"
+
+    return f"- {name} — {price}"
+
+
 def build_flight_block(db: Session) -> str:
-    flight = get_flight_info(db)
-    if not flight:
+    flight_obj = db.query(Flight).first()
+    if not flight_obj:
         return ""
+
+    route = flight_obj.route
+    aircraft = flight_obj.aircraft
+    is_domestic = bool(route.is_domestic) if route else False
+
+    origin = route.origin_city if route else "—"
+    destination = route.destination_city if route else "—"
 
     lines = [
         "=== FLIGHT (информация о текущем рейсе) ===",
-        f"Рейс: {flight.get('flight_number', '—')}",
-        f"Маршрут: {flight.get('origin', '—')} → {flight.get('destination', '—')}",
-        f"Вылет: {flight.get('departure_time', '—')}",
-        f"Прибытие: {flight.get('arrival_time', '—')}",
-        f"Воздушное судно: {flight.get('aircraft_type', '—')} "
-        f"(бортовой номер {flight.get('aircraft_reg', '—')})",
-        f"Крейсерская высота: {flight.get('cruising_altitude', '—')} м",
-        f"Крейсерская скорость: {flight.get('cruising_speed', '—')} км/ч",
+        f"Рейс: {flight_obj.flight_number}",
+        f"Маршрут: {origin} → {destination}",
+        f"Тип рейса: {'внутренний' if is_domestic else 'международный'}",
+        f"Вылет: {flight_obj.departure_time}",
+        f"Прибытие: {flight_obj.arrival_time}",
+        f"Воздушное судно: {aircraft.aircraft_type if aircraft else '—'} "
+        f"(бортовой номер {aircraft.registration if aircraft else '—'})",
+        f"Крейсерская высота: {flight_obj.cruising_altitude or '—'} м",
+        f"Крейсерская скорость: {flight_obj.cruising_speed or '—'} км/ч",
     ]
 
-    rf = flight.get("return_flight")
-    if rf:
+    if flight_obj.weather_description_ru or flight_obj.weather_temp_celsius is not None:
+        weather_parts = []
+
+        if flight_obj.weather_description_ru:
+            weather_parts.append(flight_obj.weather_description_ru)
+
+        if flight_obj.weather_temp_celsius is not None:
+            temp_text = f"{flight_obj.weather_temp_celsius:+d}°C"
+            if temp_text not in " ".join(weather_parts):
+                weather_parts.append(temp_text)
+
+        lines.extend([
+            "",
+            f"Текущая погода в пункте назначения ({destination}): " + ", ".join(weather_parts),
+        ])
+
+    if is_domestic:
+        lines.extend([
+            "",
+            "Курс валюты: рейс внутренний, курс валют для пункта назначения не используется.",
+        ])
+    else:
+        exchange_text = None
+
+        if flight_obj.exchange_rate_note_ru:
+            exchange_text = flight_obj.exchange_rate_note_ru
+        elif flight_obj.exchange_rate_currency and flight_obj.exchange_rate_to_rub:
+            exchange_text = (
+                f"1 {flight_obj.exchange_rate_currency} = "
+                f"{flight_obj.exchange_rate_to_rub:g} ₽"
+            )
+
+        if exchange_text:
+            lines.extend([
+                "",
+                f"Курс валюты для пункта назначения: {exchange_text}",
+            ])
+
+    if flight_obj.return_flight_number:
         lines.extend([
             "",
             "Обратный рейс:",
-            f"  Рейс: {rf.get('flight_number', '—')}",
-            f"  Маршрут: {rf.get('origin', '—')} → {rf.get('destination', '—')}",
-            f"  Вылет: {rf.get('departure_time', '—')}",
-            f"  Прибытие: {rf.get('arrival_time', '—')}",
+            f"  Рейс: {flight_obj.return_flight_number}",
+            f"  Маршрут: {destination} → {origin}",
+            f"  Вылет: {flight_obj.return_departure_time or '—'}",
+            f"  Прибытие: {flight_obj.return_arrival_time or '—'}",
         ])
 
-    # Меню
-    menu = get_menu(db)
-    if menu:
-        lines.append("")
-        lines.append("Меню (эконом-класс):")
-        for item in menu:
-            veg = " (вегетарианское)" if item["is_vegetarian"] else ""
-            price = "включено в билет" if item["price"] == 0.0 else f"{item['price']} руб."
-            lines.append(f"- {item['name']}{veg}: {item['description']} — {price}")
+    menu_items = (
+        db.query(MenuItem)
+        .filter(MenuItem.flight_id == flight_obj.id)
+        .order_by(MenuItem.cabin_class.asc(), MenuItem.id.asc())
+        .all()
+    )
 
-    # Коммерческие предложения
-    offers = get_commercial_offers(db)
+    economy_menu = [item for item in menu_items if item.cabin_class == "economy"]
+    business_menu = [item for item in menu_items if item.cabin_class == "business"]
+
+    if economy_menu:
+        lines.append("")
+        lines.append("Питание эконом-класса:")
+        for item in economy_menu:
+            lines.append(_format_menu_item(item))
+
+    if business_menu:
+        lines.append("")
+        lines.append("Питание бизнес-класса:")
+        for item in business_menu:
+            lines.append(_format_menu_item(item))
+
+    offers = db.query(CommercialOffer).filter(CommercialOffer.flight_id == flight_obj.id).all()
     if offers:
         lines.append("")
         lines.append("Специальные предложения:")
         for offer in offers:
-            lines.append(f"- {offer['title']}: {offer['description']}")
+            title = offer.title_ru or offer.title_en or "Предложение"
+            description = offer.description_ru or offer.description_en or ""
+            lines.append(f"- {title}: {description}")
 
     return "\n".join(lines)
 
@@ -173,8 +244,10 @@ SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиако�
 ИНСТРУКЦИИ:
 1. Отвечай на вопрос пассажира, используя ТОЛЬКО факты из блока КОНТЕКСТ ниже.
 2. Для вопросов о текущем рейсе, меню, времени вылета/прилёта — используй
-   блок FLIGHT. Для вопросов о городах, визах, транспорте, достопримечатель-
-   ностях — используй блок KNOWLEDGE.
+   блок FLIGHT. Для вопросов о маршрутной сети AeroLine, направлениях,
+   городах полётов, внутренних и международных маршрутах — используй
+   блок ROUTE_NETWORK. Для вопросов о городах, визах, транспорте,
+   достопримечательностях — используй блок KNOWLEDGE.
 3. Если в контексте есть подходящая информация — давай прямой, полезный ответ.
    Не начинай ответ с оговорок о том, что есть или чего нет в контексте.
 4. Используй ТОЛЬКО те названия, места, цены и факты, которые буквально
@@ -189,6 +262,7 @@ SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиако�
 9. Для вопросов о ТЕКУЩЕЙ погоде, температуре, курсе валют — используй ТОЛЬКО блок FLIGHT.
    В блоке KNOWLEDGE содержатся общеклиматические сведения по сезонам — не используй
    их как ответ на вопрос «какая погода сейчас» или «сколько градусов».
+10. Не пиши слово "KNOWLEDGE" в ответе.
    
 КОНТЕКСТ:
 {context}
@@ -202,7 +276,9 @@ SYSTEM_PROMPT_EN = """You are an in-flight assistant for AeroLine airline.
 INSTRUCTIONS:
 1. Answer the passenger's question using ONLY facts from the CONTEXT below.
 2. For questions about the current flight, menu, departure/arrival times —
-   use the FLIGHT block. For questions about cities, visas, transport,
+   use the FLIGHT block. For questions about AeroLine route network,
+   destinations, domestic routes, and international routes — use the
+   ROUTE_NETWORK block. For questions about cities, visas, transport,
    attractions — use the KNOWLEDGE block.
 3. If the context contains relevant information — give a direct, helpful answer.
    Do not preface your answer with disclaimers about what the context does or
@@ -220,7 +296,8 @@ INSTRUCTIONS:
    ONLY the FLIGHT block. The KNOWLEDGE block contains seasonal climate 
    information and general currency facts — these are NOT answers to questions 
    like "what's the weather now" or "how many degrees".
-   
+10. Do not write "KNOWLEDGE" in your answer.
+
 CONTEXT:
 {context}
 
@@ -229,10 +306,11 @@ Answer:"""
 
 
 def build_prompt(user_message: str, db: Session) -> str:
+    route_network_block = build_route_network_block(user_message)
     flight_block = build_flight_block(db)
     knowledge_block = build_knowledge_block(user_message)
 
-    blocks = [b for b in (knowledge_block, flight_block) if b]
+    blocks = [b for b in (route_network_block, knowledge_block, flight_block) if b]
     context = "\n\n".join(blocks) if blocks else "(контекст отсутствует)"
 
     lang = detect_language(user_message)

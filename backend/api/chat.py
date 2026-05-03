@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from backend import chat_db
 from backend.db.database import get_db
+from backend.rag.route_network import build_route_network_answer, is_route_network_question
+from backend.rag.baggage_rules import build_baggage_answer, is_baggage_question
 
 logger = logging.getLogger("skyassist")
 
@@ -35,6 +37,10 @@ class SessionRename(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=5000)
+
+
+class MessageFeedbackUpdate(BaseModel):
+    feedback: Literal["like", "dislike"] | None = None
 
 
 class MessageResponse(BaseModel):
@@ -100,6 +106,26 @@ def list_messages_endpoint(session_id: str) -> list[dict[str, Any]]:
     return chat_db.get_messages(session_id)
 
 
+@router.patch("/sessions/{session_id}/messages/{message_id}/feedback")
+def update_message_feedback_endpoint(
+    session_id: str,
+    message_id: int,
+    payload: MessageFeedbackUpdate,
+) -> dict[str, Any]:
+    _ensure_session_exists(session_id)
+    try:
+        message = chat_db.set_message_feedback(session_id, message_id, payload.feedback)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if message is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Ответ ассистента не найден в этой сессии",
+        )
+    return message
+
+
 @router.post("/sessions/{session_id}/messages", status_code=201)
 async def send_message_endpoint(
     session_id: str,
@@ -126,7 +152,12 @@ async def send_message_endpoint(
 
     # получить ответ ассистента
     try:
-        assistant_response = await _process_message_fn(payload.content, db)
+        if is_baggage_question(payload.content):
+            assistant_response = build_baggage_answer(payload.content)
+        elif is_route_network_question(payload.content):
+            assistant_response = build_route_network_answer(payload.content)
+        else:
+            assistant_response = await _process_message_fn(payload.content, db)
     except HTTPException:
         raise
     except Exception as exc:

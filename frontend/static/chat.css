@@ -1,4 +1,4 @@
-/* SkyAssist — светлая тема, минималистичный стиль как ChatGPT */
+/* SkyAssist  */
 
 :root {
     --color-bg: #ffffff;
@@ -537,4 +537,94 @@ body {
     .sidebar.open {
         transform: translateX(0);
     }
+}
+
+/* ===== Время сообщений ===== */
+
+.message-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.message-time {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-weight: 400;
+    opacity: 0.75;
+}
+
+/* ===== Лайк / дизлайк ответа ===== */
+
+.message-feedback {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    min-height: 28px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.message.assistant:hover .message-feedback,
+.message-feedback:focus-within,
+.message-feedback.has-selected-feedback {
+    opacity: 1;
+}
+
+.feedback-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    color: var(--color-text-muted);
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.08s ease;
+}
+
+.feedback-btn:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+}
+
+.feedback-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.feedback-btn.active {
+    background: #e8f0fe;
+    border-color: #c6dafc;
+    color: var(--color-primary);
+}
+
+.feedback-btn.active svg {
+    fill: currentColor;
+}
+
+.feedback-btn:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.feedback-status {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.message-feedback.has-selected-feedback .feedback-status {
+    opacity: 1;
 }

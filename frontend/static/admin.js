@@ -1,52 +1,42 @@
-/**
- * SkyAssist админ-панель.
- * Vanilla JS, три вкладки (Рейс / Борты / Маршруты).
- *
- * Главное:
- * - Вкладка «Рейс» — большая форма с динамическими списками меню и предложений
- * - Вкладки «Борты» и «Маршруты» — таблицы с CRUD через модалки
- * - Все действия дают toast-уведомление
- */
-
-// ===== Состояние =====
-
-let currentFlightData = null;     // последнее загруженное состояние рейса (для reset)
-let aircraftList = [];             // справочник для dropdown'а в форме рейса
-let routesList = [];               // тот же
-let menuItemCounter = 0;           // счётчик для уникальных id строк меню
-let offerCounter = 0;              // счётчик для уникальных id строк предложений
-
-// ===== DOM ссылки =====
+let currentFlightData = null;
+let aircraftList = [];
+let routesList = [];
+let offerCounter = 0;
 
 const $ = (id) => document.getElementById(id);
-
-// ===== API-обёртка =====
 
 async function api(method, path, body = null) {
     const opts = {
         method,
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
     };
-    if (body !== null) opts.body = JSON.stringify(body);
+
+    if (body !== null) {
+        opts.body = JSON.stringify(body);
+    }
 
     const res = await fetch(path, opts);
-    if (res.status === 204) return null;
+
+    if (res.status === 204) {
+        return null;
+    }
 
     const data = await res.json().catch(() => ({}));
+
     if (!res.ok) {
         const detail = data.detail;
-        // Если detail — объект с errors, делаем структурное исключение
+
         if (detail && typeof detail === 'object' && detail.errors) {
             const err = new Error(detail.message || 'Ошибка валидации');
             err.errors = detail.errors;
             throw err;
         }
-        throw new Error(detail || `${res.status} ${res.statusText}`);
+
+        throw new Error(typeof detail === 'string' ? detail : `${res.status} ${res.statusText}`);
     }
+
     return data;
 }
-
-// ===== Toasts =====
 
 function toast(message, type = 'info', errors = null) {
     const el = document.createElement('div');
@@ -56,11 +46,13 @@ function toast(message, type = 'info', errors = null) {
     if (errors && errors.length) {
         const ul = document.createElement('ul');
         ul.className = 'toast-list';
-        errors.forEach(e => {
+
+        errors.forEach(error => {
             const li = document.createElement('li');
-            li.textContent = e;
+            li.textContent = error;
             ul.appendChild(li);
         });
+
         el.appendChild(ul);
     }
 
@@ -68,39 +60,66 @@ function toast(message, type = 'info', errors = null) {
     setTimeout(() => el.remove(), errors ? 8000 : 3500);
 }
 
-// ===== Вкладки =====
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function parseIntOrNull(value) {
+    if (value === '' || value == null) {
+        return null;
+    }
+
+    const number = parseInt(value, 10);
+    return Number.isNaN(number) ? null : number;
+}
+
+function parseFloatOrNull(value) {
+    if (value === '' || value == null) {
+        return null;
+    }
+
+    const number = parseFloat(value);
+    return Number.isNaN(number) ? null : number;
+}
+
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === name);
+    });
+
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.toggle('active', panel.id === `panel-${name}`);
+    });
+
+    if (name === 'aircraft') {
+        loadAircraftTable();
+    }
+
+    if (name === 'routes') {
+        loadRoutesTable();
+    }
+}
 
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
 });
 
-function switchTab(name) {
-    document.querySelectorAll('.tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.tab === name);
-    });
-    document.querySelectorAll('.tab-panel').forEach(p => {
-        p.classList.toggle('active', p.id === `panel-${name}`);
-    });
-
-    // При переходе на вкладку — обновляем её данные
-    if (name === 'aircraft') loadAircraftTable();
-    if (name === 'routes') loadRoutesTable();
-}
-
-// ===== Вкладка: РЕЙС =====
-
 async function loadFlightData() {
     try {
-        // Параллельно тянем все три источника
         const [flightData, aircraft, routes] = await Promise.all([
             api('GET', '/api/admin/flight'),
             api('GET', '/api/admin/aircraft'),
             api('GET', '/api/admin/routes'),
         ]);
 
-        aircraftList = aircraft;
-        routesList = routes;
         currentFlightData = flightData;
+        aircraftList = aircraft || [];
+        routesList = routes || [];
 
         fillAircraftSelect();
         fillRoutesSelect();
@@ -112,41 +131,109 @@ async function loadFlightData() {
 
 function fillAircraftSelect() {
     const select = $('aircraft_id');
+
     select.innerHTML = '<option value="">— выберите борт —</option>';
-    aircraftList.forEach(a => {
-        const opt = document.createElement('option');
-        opt.value = a.id;
-        opt.textContent = `${a.registration} — ${a.aircraft_type}`;
-        select.appendChild(opt);
+
+    aircraftList.forEach(aircraft => {
+        const option = document.createElement('option');
+        option.value = aircraft.id;
+        option.textContent = `${aircraft.registration} — ${aircraft.aircraft_type}`;
+        select.appendChild(option);
     });
 }
 
 function fillRoutesSelect() {
     const select = $('route_id');
+
     select.innerHTML = '<option value="">— выберите маршрут —</option>';
-    routesList.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r.id;
-        opt.textContent = `${r.origin_iata} → ${r.destination_iata} (${r.origin_city} — ${r.destination_city})`;
-        select.appendChild(opt);
+
+    routesList.forEach(route => {
+        const option = document.createElement('option');
+        option.value = route.id;
+
+        const routeType = route.is_domestic ? 'внутренний' : 'международный';
+        option.textContent = `${route.origin_iata} → ${route.destination_iata} (${route.origin_city} — ${route.destination_city}, ${routeType})`;
+
+        select.appendChild(option);
     });
 }
 
+function getSelectedRoute() {
+    const routeId = parseInt($('route_id').value, 10);
+
+    if (!routeId) {
+        return null;
+    }
+
+    return routesList.find(route => Number(route.id) === routeId) || null;
+}
+
+function isSelectedRouteDomestic() {
+    const route = getSelectedRoute();
+
+    if (!route) {
+        return false;
+    }
+
+    return Boolean(route.is_domestic);
+}
+
+function setExchangeFieldsDisabled(disabled) {
+    $('exchange_rate_currency').disabled = disabled;
+    $('exchange_rate_to_rub').disabled = disabled;
+    $('exchange_rate_note_ru').disabled = disabled;
+    $('exchange_rate_note_en').disabled = disabled;
+}
+
+function clearExchangeFields() {
+    $('exchange_rate_currency').value = '';
+    $('exchange_rate_to_rub').value = '';
+    $('exchange_rate_note_ru').value = '';
+    $('exchange_rate_note_en').value = '';
+}
+
+function updateExchangeRateState() {
+    const route = getSelectedRoute();
+    const card = $('exchange-rate-card');
+    const hint = $('exchange-rate-hint');
+
+    if (!card || !hint) {
+        return;
+    }
+
+    if (!route) {
+        card.classList.remove('muted-card');
+        setExchangeFieldsDisabled(false);
+        hint.textContent = 'Для внутренних рейсов курс валюты можно не заполнять.';
+        return;
+    }
+
+    if (Boolean(route.is_domestic)) {
+        card.classList.add('muted-card');
+        clearExchangeFields();
+        setExchangeFieldsDisabled(true);
+        hint.textContent = 'Выбран внутренний рейс. Курс валюты будет очищен и не будет использоваться.';
+        return;
+    }
+
+    card.classList.remove('muted-card');
+    setExchangeFieldsDisabled(false);
+    hint.textContent = 'Для международного рейса можно указать валюту пункта назначения и курс к рублю.';
+}
+
 function fillFlightForm(data) {
-    // Очищаем динамические списки
-    $('menu-economy').innerHTML = '';
-    $('menu-business').innerHTML = '';
+    $('menu_economy_text').value = '';
+    $('menu_business_text').value = '';
     $('offers-list').innerHTML = '';
 
-    if (!data.flight) {
-        // Нет рейса — оставляем пустую форму
+    if (!data || !data.flight) {
         $('meal-type-hint').textContent = '';
+        updateExchangeRateState();
         return;
     }
 
     const f = data.flight;
 
-    // Обычные поля
     $('flight_number').value = f.flight_number || '';
     $('departure_time').value = f.departure_time || '';
     $('arrival_time').value = f.arrival_time || '';
@@ -169,87 +256,85 @@ function fillFlightForm(data) {
     $('exchange_rate_note_ru').value = f.exchange_rate_note_ru || '';
     $('exchange_rate_note_en').value = f.exchange_rate_note_en || '';
 
-    // Меню
-    data.menu_items.forEach(m => addMenuRow(m.cabin_class, m));
+    fillMenuTextareas(data.menu_items || []);
 
-    // Предложения
-    data.commercial_offers.forEach(o => addOfferRow(o));
+    (data.commercial_offers || []).forEach(offer => addOfferRow(offer));
 
+    updateExchangeRateState();
     updateMealTypeHint();
 }
 
-function addMenuRow(cabinClass, data = null) {
-    const id = `menu-${menuItemCounter++}`;
-    const container = $(`menu-${cabinClass}`);
+function fillMenuTextareas(menuItems) {
+    const economy = [];
+    const business = [];
 
-    const row = document.createElement('div');
-    row.className = 'menu-row';
-    row.dataset.menuId = id;
-    row.dataset.cabinClass = cabinClass;
+    menuItems.forEach(item => {
+        const name = item.name_ru || item.name_en || '';
+        const description = item.description_ru || item.description_en || '';
 
-    row.innerHTML = `
-        <button type="button" class="delete-btn" title="Удалить">×</button>
+        let text = '';
 
-        <div class="grid-2">
-            <div class="field">
-                <label>Название (RU) *</label>
-                <input type="text" class="m-name_ru" maxlength="200" required>
-            </div>
-            <div class="field">
-                <label>Название (EN)</label>
-                <input type="text" class="m-name_en" maxlength="200">
-            </div>
-        </div>
+        if (
+            description
+            && name
+            && name !== 'Меню эконом-класса'
+            && name !== 'Меню бизнес-класса'
+            && name !== 'Economy class menu'
+            && name !== 'Business class menu'
+        ) {
+            text = `${name}: ${description}`;
+        } else {
+            text = description || name;
+        }
 
-        <div class="grid-2">
-            <div class="field">
-                <label>Описание (RU)</label>
-                <input type="text" class="m-description_ru" maxlength="500">
-            </div>
-            <div class="field">
-                <label>Описание (EN)</label>
-                <input type="text" class="m-description_en" maxlength="500">
-            </div>
-        </div>
+        if (!text) {
+            return;
+        }
 
-        <div class="grid-3">
-            <div class="field">
-                <label>Категория</label>
-                <select class="m-category">
-                    <option value="main">Основное блюдо</option>
-                    <option value="starter">Закуска</option>
-                    <option value="dessert">Десерт</option>
-                    <option value="drink">Напиток</option>
-                    <option value="snack">Снэк/сэндвич</option>
-                </select>
-            </div>
-            <div class="field">
-                <label>Цена, руб (0 = включено)</label>
-                <input type="number" step="0.01" class="m-price" value="0">
-            </div>
-            <div class="field checkbox-field">
-                <label>
-                    <input type="checkbox" class="m-is_vegetarian">
-                    Вегетарианское
-                </label>
-            </div>
-        </div>
-    `;
+        if (item.cabin_class === 'business') {
+            business.push(text);
+        } else {
+            economy.push(text);
+        }
+    });
 
-    // Заполнение значениями
-    if (data) {
-        row.querySelector('.m-name_ru').value = data.name_ru || '';
-        row.querySelector('.m-name_en').value = data.name_en || '';
-        row.querySelector('.m-description_ru').value = data.description_ru || '';
-        row.querySelector('.m-description_en').value = data.description_en || '';
-        row.querySelector('.m-category').value = data.category || 'main';
-        row.querySelector('.m-price').value = data.price ?? 0;
-        row.querySelector('.m-is_vegetarian').checked = !!data.is_vegetarian;
+    $('menu_economy_text').value = economy.join('\n');
+    $('menu_business_text').value = business.join('\n');
+}
+
+function collectMenuItems() {
+    const items = [];
+
+    const economyText = $('menu_economy_text').value.trim();
+    const businessText = $('menu_business_text').value.trim();
+
+    if (economyText) {
+        items.push({
+            name_ru: 'Меню эконом-класса',
+            name_en: 'Economy class menu',
+            description_ru: economyText,
+            description_en: null,
+            category: 'main',
+            cabin_class: 'economy',
+            is_vegetarian: false,
+            price: 0,
+        });
     }
 
-    row.querySelector('.delete-btn').addEventListener('click', () => row.remove());
+    if (businessText) {
+        items.push({
+            name_ru: 'Меню бизнес-класса',
+            name_en: 'Business class menu',
+            description_ru: businessText,
+            description_en: null,
+            category: 'main',
+            cabin_class: 'business',
+            is_vegetarian: false,
+            price: 0,
+        });
+    }
 
-    container.appendChild(row);
+    return items;
 }
 
 function addOfferRow(data = null) {
@@ -300,11 +385,60 @@ function addOfferRow(data = null) {
     }
 
     row.querySelector('.delete-btn').addEventListener('click', () => row.remove());
+
     container.appendChild(row);
 }
 
-document.querySelectorAll('.btn-add[data-class]').forEach(btn => {
-    btn.addEventListener('click', () => addMenuRow(btn.dataset.class));
+function collectOffers() {
+    const offers = [];
+
+    document.querySelectorAll('.menu-row[data-offer-id]').forEach(row => {
+        const titleRu = row.querySelector('.o-title_ru').value.trim();
+
+        if (!titleRu) {
+            return;
+        }
+
+        offers.push({
+            title_ru: titleRu,
+            title_en: row.querySelector('.o-title_en').value.trim() || null,
+            description_ru: row.querySelector('.o-description_ru').value.trim() || null,
+            description_en: row.querySelector('.o-description_en').value.trim() || null,
+            category: row.querySelector('.o-category').value.trim() || null,
+        });
+    });
+
+    return offers;
+}
+
+async function updateMealTypeHint() {
+    const routeId = $('route_id').value;
+
+    if (!routeId) {
+        $('meal-type-hint').textContent = '';
+        return;
+    }
+
+    try {
+        const data = await api('GET', `/api/admin/flight/suggest-meal-type?route_id=${routeId}`);
+
+        const labelMap = {
+            full: 'полный приём пищи',
+            light: 'лёгкий перекус',
+            snack_only: 'только снэки',
+            no_meal: 'без питания',
+        };
+
+        $('meal-type-hint').textContent =
+            `Длительность рейса ${data.duration_min} мин — рекомендуется «${labelMap[data.meal_type] || data.meal_type}»`;
+    } catch (err) {
+        $('meal-type-hint').textContent = '';
+    }
+}
+
+$('route_id').addEventListener('change', () => {
+    updateExchangeRateState();
+    updateMealTypeHint();
 });
 
 $('btn-add-offer').addEventListener('click', () => addOfferRow());
@@ -314,32 +448,6 @@ $('reload-flight-btn').addEventListener('click', () => {
     toast('Изменения сброшены', 'info');
 });
 
-// При выборе route — подсказываем meal_type
-$('route_id').addEventListener('change', async () => {
-    const routeId = $('route_id').value;
-    if (!routeId) {
-        $('meal-type-hint').textContent = '';
-        return;
-    }
-    try {
-        const data = await api('GET', `/api/admin/flight/suggest-meal-type?route_id=${routeId}`);
-        const labelMap = {
-            'full': 'полный приём пищи',
-            'light': 'лёгкий перекус',
-            'snack_only': 'только снэки',
-            'no_meal': 'без питания',
-        };
-        $('meal-type-hint').textContent =
-            `Длительность рейса ${data.duration_min} мин — рекомендуется «${labelMap[data.meal_type]}»`;
-
-        // Если пользователь не трогал meal_type — подставим автоматически
-        // (только если поле в дефолтном состоянии — для UX-простоты не трогаем)
-    } catch (err) {
-        $('meal-type-hint').textContent = '';
-    }
-});
-
-// Сборка payload и отправка PUT /flight
 $('flight-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -375,13 +483,21 @@ $('flight-form').addEventListener('submit', async (e) => {
         return;
     }
 
+    if (isSelectedRouteDomestic()) {
+        payload.exchange_rate_currency = null;
+        payload.exchange_rate_to_rub = null;
+        payload.exchange_rate_note_ru = null;
+        payload.exchange_rate_note_en = null;
+    }
+
     const btn = $('save-flight-btn');
     btn.disabled = true;
     btn.textContent = 'Сохранение...';
+
     try {
         await api('PUT', '/api/admin/flight', payload);
         toast('Рейс сохранён и применён', 'success');
-        loadFlightData();  // перезагружаем данные с свежими id'шниками
+        await loadFlightData();
     } catch (err) {
         toast(err.message, 'error', err.errors);
     } finally {
@@ -390,61 +506,11 @@ $('flight-form').addEventListener('submit', async (e) => {
     }
 });
 
-function collectMenuItems() {
-    const items = [];
-    document.querySelectorAll('.menu-row[data-menu-id]').forEach(row => {
-        items.push({
-            name_ru: row.querySelector('.m-name_ru').value.trim(),
-            name_en: row.querySelector('.m-name_en').value.trim() || null,
-            description_ru: row.querySelector('.m-description_ru').value.trim() || null,
-            description_en: row.querySelector('.m-description_en').value.trim() || null,
-            category: row.querySelector('.m-category').value,
-            cabin_class: row.dataset.cabinClass,
-            is_vegetarian: row.querySelector('.m-is_vegetarian').checked,
-            price: parseFloat(row.querySelector('.m-price').value) || 0,
-        });
-    });
-    return items;
-}
-
-function collectOffers() {
-    const offers = [];
-    document.querySelectorAll('.menu-row[data-offer-id]').forEach(row => {
-        offers.push({
-            title_ru: row.querySelector('.o-title_ru').value.trim(),
-            title_en: row.querySelector('.o-title_en').value.trim() || null,
-            description_ru: row.querySelector('.o-description_ru').value.trim() || null,
-            description_en: row.querySelector('.o-description_en').value.trim() || null,
-            category: row.querySelector('.o-category').value.trim() || null,
-        });
-    });
-    return offers;
-}
-
-function parseIntOrNull(value) {
-    if (value === '' || value == null) return null;
-    const n = parseInt(value, 10);
-    return isNaN(n) ? null : n;
-}
-
-function parseFloatOrNull(value) {
-    if (value === '' || value == null) return null;
-    const n = parseFloat(value);
-    return isNaN(n) ? null : n;
-}
-
-function updateMealTypeHint() {
-    // Триггерим обновление подсказки если route уже выбран
-    const evt = new Event('change');
-    $('route_id').dispatchEvent(evt);
-}
-
-// ===== Вкладка: БОРТЫ =====
-
 async function loadAircraftTable() {
     try {
         aircraftList = await api('GET', '/api/admin/aircraft');
         renderAircraftTable();
+        fillAircraftSelect();
     } catch (err) {
         toast(`Ошибка загрузки бортов: ${err.message}`, 'error');
     }
@@ -458,18 +524,22 @@ function renderAircraftTable() {
         return;
     }
 
-    tbody.innerHTML = aircraftList.map(a => `
+    tbody.innerHTML = aircraftList.map(aircraft => `
         <tr>
-            <td><strong>${escapeHtml(a.registration)}</strong></td>
-            <td>${escapeHtml(a.aircraft_type)}</td>
-            <td>${escapeHtml(a.manufacturer || '—')}</td>
-            <td>${a.capacity_economy ?? '—'}</td>
-            <td>${a.capacity_business ?? '—'}</td>
-            <td>${a.year_manufactured ?? '—'}</td>
-            <td><span class="status-badge ${a.status}">${a.status === 'active' ? 'Активный' : 'Обслуживание'}</span></td>
+            <td><strong>${escapeHtml(aircraft.registration)}</strong></td>
+            <td>${escapeHtml(aircraft.aircraft_type)}</td>
+            <td>${escapeHtml(aircraft.manufacturer || '—')}</td>
+            <td>${aircraft.capacity_economy ?? '—'}</td>
+            <td>${aircraft.capacity_business ?? '—'}</td>
+            <td>${aircraft.year_manufactured ?? '—'}</td>
+            <td>
+                <span class="status-badge ${escapeHtml(aircraft.status)}">
+                    ${aircraft.status === 'active' ? 'Активный' : 'Обслуживание'}
+                </span>
+            </td>
             <td class="actions">
-                <button class="btn-icon" data-edit-aircraft="${a.id}">Изм.</button>
-                <button class="btn-icon danger" data-delete-aircraft="${a.id}">Удал.</button>
+                <button class="btn-icon" data-edit-aircraft="${aircraft.id}">Изм.</button>
+                <button class="btn-icon danger" data-delete-aircraft="${aircraft.id}">Удал.</button>
             </td>
         </tr>
     `).join('');
@@ -477,8 +547,8 @@ function renderAircraftTable() {
     tbody.querySelectorAll('[data-edit-aircraft]').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = parseInt(btn.dataset.editAircraft, 10);
-            const a = aircraftList.find(x => x.id === id);
-            openAircraftModal(a);
+            const aircraft = aircraftList.find(item => item.id === id);
+            openAircraftModal(aircraft);
         });
     });
 
@@ -509,13 +579,18 @@ function closeAircraftModal() {
 }
 
 $('aircraft-cancel').addEventListener('click', closeAircraftModal);
+
 $('aircraft-modal').addEventListener('click', (e) => {
-    if (e.target === $('aircraft-modal')) closeAircraftModal();
+    if (e.target === $('aircraft-modal')) {
+        closeAircraftModal();
+    }
 });
 
 $('aircraft-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+
     const id = $('aircraft-id').value;
+
     const payload = {
         registration: $('ac-registration').value.trim(),
         aircraft_type: $('ac-aircraft_type').value.trim(),
@@ -534,31 +609,44 @@ $('aircraft-form').addEventListener('submit', async (e) => {
             await api('POST', '/api/admin/aircraft', payload);
             toast(`Борт ${payload.registration} добавлен`, 'success');
         }
+
         closeAircraftModal();
-        loadAircraftTable();
+        await loadAircraftTable();
+        await loadFlightData();
     } catch (err) {
         toast(err.message, 'error');
     }
 });
 
 async function deleteAircraft(id) {
-    const a = aircraftList.find(x => x.id === id);
-    if (!confirm(`Удалить борт ${a.registration}?`)) return;
+    const aircraft = aircraftList.find(item => item.id === id);
+
+    if (!aircraft) {
+        return;
+    }
+
+    if (!confirm(`Удалить борт ${aircraft.registration}?`)) {
+        return;
+    }
+
     try {
         await api('DELETE', `/api/admin/aircraft/${id}`);
-        toast(`Борт ${a.registration} удалён`, 'success');
-        loadAircraftTable();
+        toast(`Борт ${aircraft.registration} удалён`, 'success');
+        await loadAircraftTable();
+        await loadFlightData();
     } catch (err) {
         toast(err.message, 'error');
     }
 }
 
-// ===== Вкладка: МАРШРУТЫ =====
-
 async function loadRoutesTable() {
     try {
         routesList = await api('GET', '/api/admin/routes');
         renderRoutesTable();
+        fillRoutesSelect();
+        if (currentFlightData) {
+            fillFlightForm(currentFlightData);
+        }
     } catch (err) {
         toast(`Ошибка загрузки маршрутов: ${err.message}`, 'error');
     }
@@ -572,16 +660,16 @@ function renderRoutesTable() {
         return;
     }
 
-    tbody.innerHTML = routesList.map(r => `
+    tbody.innerHTML = routesList.map(route => `
         <tr>
-            <td><strong>${escapeHtml(r.origin_iata)}</strong> ${escapeHtml(r.origin_city)}</td>
-            <td><strong>${escapeHtml(r.destination_iata)}</strong> ${escapeHtml(r.destination_city)}</td>
-            <td>${r.is_domestic ? 'Внутренний' : 'Международный'}</td>
-            <td>${r.flight_duration_min ?? '—'}</td>
-            <td>${r.distance_km ?? '—'}</td>
+            <td><strong>${escapeHtml(route.origin_iata)}</strong> ${escapeHtml(route.origin_city)}</td>
+            <td><strong>${escapeHtml(route.destination_iata)}</strong> ${escapeHtml(route.destination_city)}</td>
+            <td>${route.is_domestic ? 'Внутренний' : 'Международный'}</td>
+            <td>${route.flight_duration_min ?? '—'}</td>
+            <td>${route.distance_km ?? '—'}</td>
             <td class="actions">
-                <button class="btn-icon" data-edit-route="${r.id}">Изм.</button>
-                <button class="btn-icon danger" data-delete-route="${r.id}">Удал.</button>
+                <button class="btn-icon" data-edit-route="${route.id}">Изм.</button>
+                <button class="btn-icon danger" data-delete-route="${route.id}">Удал.</button>
             </td>
         </tr>
     `).join('');
@@ -589,8 +677,8 @@ function renderRoutesTable() {
     tbody.querySelectorAll('[data-edit-route]').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = parseInt(btn.dataset.editRoute, 10);
-            const r = routesList.find(x => x.id === id);
-            openRouteModal(r);
+            const route = routesList.find(item => item.id === id);
+            openRouteModal(route);
         });
     });
 
@@ -610,7 +698,7 @@ function openRouteModal(data) {
     $('rt-destination_city').value = data?.destination_city || '';
     $('rt-destination_iata').value = data?.destination_iata || '';
     $('rt-destination_country').value = data?.destination_country || '';
-    $('rt-is_domestic').checked = !!data?.is_domestic;
+    $('rt-is_domestic').checked = Boolean(data?.is_domestic);
     $('rt-flight_duration_min').value = data?.flight_duration_min ?? '';
     $('rt-distance_km').value = data?.distance_km ?? '';
 
@@ -623,13 +711,18 @@ function closeRouteModal() {
 }
 
 $('route-cancel').addEventListener('click', closeRouteModal);
+
 $('route-modal').addEventListener('click', (e) => {
-    if (e.target === $('route-modal')) closeRouteModal();
+    if (e.target === $('route-modal')) {
+        closeRouteModal();
+    }
 });
 
 $('route-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+
     const id = $('route-id').value;
+
     const payload = {
         origin_city: $('rt-origin_city').value.trim(),
         origin_iata: $('rt-origin_iata').value.trim().toUpperCase(),
@@ -645,39 +738,39 @@ $('route-form').addEventListener('submit', async (e) => {
     try {
         if (id) {
             await api('PUT', `/api/admin/routes/${id}`, payload);
-            toast(`Маршрут ${payload.origin_iata}→${payload.destination_iata} обновлён`, 'success');
+            toast('Маршрут обновлён', 'success');
         } else {
             await api('POST', '/api/admin/routes', payload);
-            toast(`Маршрут ${payload.origin_iata}→${payload.destination_iata} добавлен`, 'success');
+            toast('Маршрут добавлен', 'success');
         }
+
         closeRouteModal();
-        loadRoutesTable();
+        await loadRoutesTable();
+        await loadFlightData();
     } catch (err) {
         toast(err.message, 'error');
     }
 });
 
 async function deleteRoute(id) {
-    const r = routesList.find(x => x.id === id);
-    if (!confirm(`Удалить маршрут ${r.origin_iata}→${r.destination_iata}?`)) return;
+    const route = routesList.find(item => item.id === id);
+
+    if (!route) {
+        return;
+    }
+
+    if (!confirm(`Удалить маршрут ${route.origin_iata} → ${route.destination_iata}?`)) {
+        return;
+    }
+
     try {
         await api('DELETE', `/api/admin/routes/${id}`);
-        toast(`Маршрут ${r.origin_iata}→${r.destination_iata} удалён`, 'success');
-        loadRoutesTable();
+        toast('Маршрут удалён', 'success');
+        await loadRoutesTable();
+        await loadFlightData();
     } catch (err) {
         toast(err.message, 'error');
     }
 }
-
-// ===== Утилиты =====
-
-function escapeHtml(s) {
-    if (s == null) return '';
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-}
-
-// ===== Инициализация =====
 
 loadFlightData();
