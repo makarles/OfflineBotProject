@@ -239,15 +239,17 @@ def update_flight_endpoint(
 
 
 @router.get("/flight/suggest-meal-type")
-def suggest_meal_type_endpoint(route_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
+def suggest_meal_type_endpoint(route_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     route = db.query(Route).filter(Route.id == route_id).first()
     if not route:
         raise HTTPException(404, f"Route id={route_id} не найден")
 
-    suggested = suggest_meal_type(route.flight_duration_min)
+    duration_min = route.flight_duration_min or 0
+    suggested = suggest_meal_type(duration_min)
+
     return {
         "meal_type": suggested,
-        "duration_min": route.flight_duration_min or 0,
+        "duration_min": duration_min,
     }
 
 

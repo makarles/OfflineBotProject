@@ -2,13 +2,9 @@
 __pycache__/
 *.pyc
 .env
-data/snapshots/
 *.db
 .idea/
-data/faiss_index.bin
-data/chunks.pkl
-data/skyassist.db
-data/snapshots/
-data/knowledge_base
-tests/baseline_metrics.json
-tests/evaluation_set.jsonl
+data/
+tests/
+secrets/
+

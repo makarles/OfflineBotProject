@@ -5,6 +5,24 @@ let offerCounter = 0;
 
 const $ = (id) => document.getElementById(id);
 
+function getValue(...ids) {
+    for (const id of ids) {
+        const el = $(id);
+        if (el) {
+            return el.value.trim();
+        }
+    }
+
+    return '';
+}
+
+function setValue(id, value) {
+    const el = $(id);
+    if (el) {
+        el.value = value ?? '';
+    }
+}
+
 async function api(method, path, body = null) {
     const opts = {
         method,
@@ -221,9 +239,19 @@ function updateExchangeRateState() {
     hint.textContent = 'Для международного рейса можно указать валюту пункта назначения и курс к рублю.';
 }
 
+function clearMenuTextareas() {
+    setValue('menu_economy_text_ru', '');
+    setValue('menu_economy_text_en', '');
+    setValue('menu_business_text_ru', '');
+    setValue('menu_business_text_en', '');
+
+    // совместимость со старой версией HTML
+    setValue('menu_economy_text', '');
+    setValue('menu_business_text', '');
+}
+
 function fillFlightForm(data) {
-    $('menu_economy_text').value = '';
-    $('menu_business_text').value = '';
+    clearMenuTextareas();
     $('offers-list').innerHTML = '';
 
     if (!data || !data.flight) {
@@ -265,55 +293,85 @@ function fillFlightForm(data) {
 }
 
 function fillMenuTextareas(menuItems) {
-    const economy = [];
-    const business = [];
+    const economyRu = [];
+    const economyEn = [];
+    const businessRu = [];
+    const businessEn = [];
 
     menuItems.forEach(item => {
-        const name = item.name_ru || item.name_en || '';
-        const description = item.description_ru || item.description_en || '';
+        const ruName = item.name_ru || '';
+        const enName = item.name_en || '';
+        const ruDescription = item.description_ru || '';
+        const enDescription = item.description_en || '';
 
-        let text = '';
+        let textRu = '';
+        let textEn = '';
 
         if (
-            description
-            && name
-            && name !== 'Меню эконом-класса'
-            && name !== 'Меню бизнес-класса'
-            && name !== 'Economy class menu'
-            && name !== 'Business class menu'
+            ruDescription
+            && ruName
+            && ruName !== 'Меню эконом-класса'
+            && ruName !== 'Меню бизнес-класса'
         ) {
-            text = `${name}: ${description}`;
+            textRu = `${ruName}: ${ruDescription}`;
         } else {
-            text = description || name;
+            textRu = ruDescription || ruName;
         }
 
-        if (!text) {
-            return;
+        if (
+            enDescription
+            && enName
+            && enName !== 'Economy class menu'
+            && enName !== 'Business class menu'
+        ) {
+            textEn = `${enName}: ${enDescription}`;
+        } else {
+            textEn = enDescription || enName;
         }
 
         if (item.cabin_class === 'business') {
-            business.push(text);
+            if (textRu) {
+                businessRu.push(textRu);
+            }
+
+            if (textEn) {
+                businessEn.push(textEn);
+            }
         } else {
-            economy.push(text);
+            if (textRu) {
+                economyRu.push(textRu);
+            }
+
+            if (textEn) {
+                economyEn.push(textEn);
+            }
         }
     });
 
-    $('menu_economy_text').value = economy.join('\n');
-    $('menu_business_text').value = business.join('\n');
+    setValue('menu_economy_text_ru', economyRu.join('\n'));
+    setValue('menu_economy_text_en', economyEn.join('\n'));
+    setValue('menu_business_text_ru', businessRu.join('\n'));
+    setValue('menu_business_text_en', businessEn.join('\n'));
+
+    // совместимость со старой версией HTML
+    setValue('menu_economy_text', economyRu.join('\n'));
+    setValue('menu_business_text', businessRu.join('\n'));
 }
 
 function collectMenuItems() {
     const items = [];
 
-    const economyText = $('menu_economy_text').value.trim();
-    const businessText = $('menu_business_text').value.trim();
+    const economyTextRu = getValue('menu_economy_text_ru', 'menu_economy_text');
+    const economyTextEn = getValue('menu_economy_text_en');
+    const businessTextRu = getValue('menu_business_text_ru', 'menu_business_text');
+    const businessTextEn = getValue('menu_business_text_en');
 
-    if (economyText) {
+    if (economyTextRu || economyTextEn) {
         items.push({
             name_ru: 'Меню эконом-класса',
             name_en: 'Economy class menu',
-            description_ru: economyText,
-            description_en: null,
+            description_ru: economyTextRu || null,
+            description_en: economyTextEn || null,
             category: 'main',
             cabin_class: 'economy',
             is_vegetarian: false,
@@ -321,12 +379,12 @@ function collectMenuItems() {
         });
     }
 
-    if (businessText) {
+    if (businessTextRu || businessTextEn) {
         items.push({
             name_ru: 'Меню бизнес-класса',
             name_en: 'Business class menu',
-            description_ru: businessText,
-            description_en: null,
+            description_ru: businessTextRu || null,
+            description_en: businessTextEn || null,
             category: 'main',
             cabin_class: 'business',
             is_vegetarian: false,
@@ -446,6 +504,31 @@ $('btn-add-offer').addEventListener('click', () => addOfferRow());
 $('reload-flight-btn').addEventListener('click', () => {
     loadFlightData();
     toast('Изменения сброшены', 'info');
+});
+
+$('sync-aircraft-btn').addEventListener('click', async () => {
+    const confirmed = confirm(
+        'Передать сохранённые данные рейса на бортовой сервер самолёта?\n\n' +
+        'Передаются только уже сохранённые данные. Если вы меняли форму, сначала нажмите «Сохранить и применить».'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const btn = $('sync-aircraft-btn');
+    btn.disabled = true;
+    btn.textContent = 'Передача...';
+
+    try {
+        const result = await api('POST', '/api/sync/push-to-aircraft');
+        toast(result.message || 'Данные переданы на бортовой сервер', 'success');
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Передать данные на бортовой сервер';
+    }
 });
 
 $('flight-form').addEventListener('submit', async (e) => {
@@ -644,9 +727,7 @@ async function loadRoutesTable() {
         routesList = await api('GET', '/api/admin/routes');
         renderRoutesTable();
         fillRoutesSelect();
-        if (currentFlightData) {
-            fillFlightForm(currentFlightData);
-        }
+        updateExchangeRateState();
     } catch (err) {
         toast(`Ошибка загрузки маршрутов: ${err.message}`, 'error');
     }

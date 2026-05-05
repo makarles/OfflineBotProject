@@ -28,7 +28,6 @@
 
 <main class="content">
 
-    <!-- ============== Вкладка: РЕЙС ============== -->
     <section class="tab-panel active" id="panel-flight">
 
         <div class="panel-header">
@@ -38,7 +37,6 @@
 
         <form id="flight-form" novalidate>
 
-            <!-- Основные данные -->
             <fieldset class="card">
                 <legend>Основная информация</legend>
 
@@ -97,7 +95,6 @@
                 </div>
             </fieldset>
 
-            <!-- Обратный рейс -->
             <fieldset class="card">
                 <legend>Обратный рейс <span class="optional">(опционально)</span></legend>
 
@@ -119,7 +116,6 @@
                 </div>
             </fieldset>
 
-            <!-- Погода -->
             <fieldset class="card">
                 <legend>Погода в пункте назначения</legend>
 
@@ -141,12 +137,11 @@
                 </div>
             </fieldset>
 
-            <!-- Курс валюты -->
             <fieldset class="card" id="exchange-rate-card">
                 <legend>Курс валюты <span class="optional">(только для международных рейсов)</span></legend>
                 <div class="field-hint" id="exchange-rate-hint">
                     Для внутренних рейсов курс валюты можно не заполнять.
-                    </div>
+                </div>
 
                 <div class="grid-3">
                     <div class="field">
@@ -159,9 +154,7 @@
                         <input type="number" step="0.01" id="exchange_rate_to_rub" name="exchange_rate_to_rub" placeholder="25.30">
                     </div>
 
-                    <div class="field">
-                        <!-- placeholder, чтобы grid-3 не ломался -->
-                    </div>
+                    <div class="field"></div>
                 </div>
 
                 <div class="grid-2">
@@ -178,51 +171,85 @@
             </fieldset>
 
             <fieldset class="card">
-    <legend>Питание на борту</legend>
+                <legend>Питание на борту</legend>
 
-    <div class="field">
-        <label for="menu_economy_text">Эконом-класс</label>
-        <textarea
-            id="menu_economy_text"
-            name="menu_economy_text"
-            rows="7"
-            placeholder="Например: горячее блюдо, десерт, чай, кофе, вода..."
-        ></textarea>
-        <div class="field-hint">
-            Введите описание питания для пассажиров эконом-класса свободным текстом.
-        </div>
-    </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="menu_economy_text_ru">Эконом-класс (RU)</label>
+                        <textarea
+                            id="menu_economy_text_ru"
+                            name="menu_economy_text_ru"
+                            rows="7"
+                            placeholder="Например: куриное филе с рисом, шоколадный кекс, чай, кофе, вода..."
+                        ></textarea>
+                        <div class="field-hint">
+                            Введите описание питания для пассажиров эконом-класса на русском языке.
+                        </div>
+                    </div>
 
-    <div class="field">
-        <label for="menu_business_text">Бизнес-класс</label>
-        <textarea
-            id="menu_business_text"
-            name="menu_business_text"
-            rows="7"
-            placeholder="Например: выбор из трёх горячих блюд, закуски, десерт, напитки..."
-        ></textarea>
-        <div class="field-hint">
-            Введите описание питания для пассажиров бизнес-класса свободным текстом.
-        </div>
-    </div>
-</fieldset>
+                    <div class="field">
+                        <label for="menu_economy_text_en">Economy class (EN)</label>
+                        <textarea
+                            id="menu_economy_text_en"
+                            name="menu_economy_text_en"
+                            rows="7"
+                            placeholder="Example: chicken fillet with rice, chocolate cake, tea, coffee, water..."
+                        ></textarea>
+                        <div class="field-hint">
+                            Enter the economy class meal description in English.
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Коммерческие предложения -->
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="menu_business_text_ru">Бизнес-класс (RU)</label>
+                        <textarea
+                            id="menu_business_text_ru"
+                            name="menu_business_text_ru"
+                            rows="7"
+                            placeholder="Например: стейк, рыба, салат, десерт, шампанское..."
+                        ></textarea>
+                        <div class="field-hint">
+                            Введите описание питания для пассажиров бизнес-класса на русском языке.
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="menu_business_text_en">Business class (EN)</label>
+                        <textarea
+                            id="menu_business_text_en"
+                            name="menu_business_text_en"
+                            rows="7"
+                            placeholder="Example: steak, fish, salad, dessert, champagne..."
+                        ></textarea>
+                        <div class="field-hint">
+                            Enter the business class meal description in English.
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
             <fieldset class="card">
                 <legend>Коммерческие предложения <span class="optional">(опционально)</span></legend>
                 <div class="offers-list" id="offers-list"></div>
                 <button type="button" class="btn-add" id="btn-add-offer">+ Добавить предложение</button>
             </fieldset>
 
-            <!-- Submit -->
             <div class="form-actions">
-                <button type="submit" class="btn-primary" id="save-flight-btn">Сохранить и применить</button>
-                <button type="button" class="btn-secondary" id="reload-flight-btn">Сбросить изменения</button>
+                <button type="button" class="btn-secondary" id="sync-aircraft-btn">
+                    Передать данные на бортовой сервер
+                </button>
+                <button type="submit" class="btn-primary" id="save-flight-btn">
+                    Сохранить и применить
+                </button>
+                <button type="button" class="btn-secondary" id="reload-flight-btn">
+                    Сбросить изменения
+                </button>
             </div>
         </form>
     </section>
 
-    <!-- ============== Вкладка: БОРТЫ ============== -->
     <section class="tab-panel" id="panel-aircraft">
         <div class="panel-header">
             <h2>Справочник бортов</h2>
@@ -251,7 +278,6 @@
         </div>
     </section>
 
-    <!-- ============== Вкладка: МАРШРУТЫ ============== -->
     <section class="tab-panel" id="panel-routes">
         <div class="panel-header">
             <h2>Справочник маршрутов</h2>
@@ -280,10 +306,8 @@
 
 </main>
 
-<!-- Контейнер для toast-уведомлений -->
 <div class="toasts" id="toasts"></div>
 
-<!-- Модалка для добавления/редактирования борта -->
 <div class="modal-overlay" id="aircraft-modal" hidden>
     <div class="modal">
         <h3 id="aircraft-modal-title">Добавить борт</h3>
@@ -339,7 +363,6 @@
     </div>
 </div>
 
-<!-- Модалка для добавления/редактирования маршрута -->
 <div class="modal-overlay" id="route-modal" hidden>
     <div class="modal">
         <h3 id="route-modal-title">Добавить маршрут</h3>

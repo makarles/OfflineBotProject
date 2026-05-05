@@ -1,21 +1,134 @@
 from __future__ import annotations
 
-import json
-import logging
 import re
-from pathlib import Path
-from typing import Any
 
-logger = logging.getLogger(__name__)
 
-DEFAULT_AEROLINE_FULL_PATH = Path("data/knowledge_base/aeroline_full.json")
+DOMESTIC_DESTINATIONS = [
+    {"city_ru": "Владивосток", "city_en": "Vladivostok", "iata": "VVO", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Воронеж", "city_en": "Voronezh", "iata": "VOZ", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Екатеринбург", "city_en": "Yekaterinburg", "iata": "SVX", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Иркутск", "city_en": "Irkutsk", "iata": "IKT", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Казань", "city_en": "Kazan", "iata": "KZN", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Калининград", "city_en": "Kaliningrad", "iata": "KGD", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Краснодар", "city_en": "Krasnodar", "iata": "KRR", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Красноярск", "city_en": "Krasnoyarsk", "iata": "KJA", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Мурманск", "city_en": "Murmansk", "iata": "MMK", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Нижний Новгород", "city_en": "Nizhny Novgorod", "iata": "GOJ", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Новосибирск", "city_en": "Novosibirsk", "iata": "OVB", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Омск", "city_en": "Omsk", "iata": "OMS", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Пермь", "city_en": "Perm", "iata": "PEE", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Ростов-на-Дону", "city_en": "Rostov-on-Don", "iata": "ROV", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Самара", "city_en": "Samara", "iata": "KUF", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Санкт-Петербург", "city_en": "Saint Petersburg", "iata": "LED", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Сочи", "city_en": "Sochi", "iata": "AER", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Тюмень", "city_en": "Tyumen", "iata": "TJM", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Уфа", "city_en": "Ufa", "iata": "UFA", "country_ru": "Россия", "country_en": "Russia"},
+    {"city_ru": "Хабаровск", "city_en": "Khabarovsk", "iata": "KHV", "country_ru": "Россия", "country_en": "Russia"},
+]
+
+INTERNATIONAL_DESTINATIONS = [
+    {"city_ru": "Абу-Даби", "city_en": "Abu Dhabi", "iata": "AUH", "country_ru": "ОАЭ", "country_en": "UAE"},
+    {"city_ru": "Алматы", "city_en": "Almaty", "iata": "ALA", "country_ru": "Казахстан", "country_en": "Kazakhstan"},
+    {"city_ru": "Анталья", "city_en": "Antalya", "iata": "AYT", "country_ru": "Турция", "country_en": "Turkey"},
+    {"city_ru": "Астана", "city_en": "Astana", "iata": "NQZ", "country_ru": "Казахстан", "country_en": "Kazakhstan"},
+    {"city_ru": "Баку", "city_en": "Baku", "iata": "GYD", "country_ru": "Азербайджан", "country_en": "Azerbaijan"},
+    {"city_ru": "Бангкок", "city_en": "Bangkok", "iata": "BKK", "country_ru": "Таиланд", "country_en": "Thailand"},
+    {"city_ru": "Бишкек", "city_en": "Bishkek", "iata": "FRU", "country_ru": "Кыргызстан", "country_en": "Kyrgyzstan"},
+    {"city_ru": "Гоа", "city_en": "Goa", "iata": "GOI", "country_ru": "Индия", "country_en": "India"},
+    {"city_ru": "Дели", "city_en": "Delhi", "iata": "DEL", "country_ru": "Индия", "country_en": "India"},
+    {"city_ru": "Денпасар", "city_en": "Denpasar", "iata": "DPS", "country_ru": "Индонезия", "country_en": "Indonesia", "extra_ru": "Бали", "extra_en": "Bali"},
+    {"city_ru": "Дубай", "city_en": "Dubai", "iata": "DXB", "country_ru": "ОАЭ", "country_en": "UAE"},
+    {"city_ru": "Ереван", "city_en": "Yerevan", "iata": "EVN", "country_ru": "Армения", "country_en": "Armenia"},
+    {"city_ru": "Катманду", "city_en": "Kathmandu", "iata": "KTM", "country_ru": "Непал", "country_en": "Nepal"},
+    {"city_ru": "Коломбо", "city_en": "Colombo", "iata": "CMB", "country_ru": "Шри-Ланка", "country_en": "Sri Lanka"},
+    {"city_ru": "Куала-Лумпур", "city_en": "Kuala Lumpur", "iata": "KUL", "country_ru": "Малайзия", "country_en": "Malaysia"},
+    {"city_ru": "Мале", "city_en": "Male", "iata": "MLE", "country_ru": "Мальдивы", "country_en": "Maldives"},
+    {"city_ru": "Минск", "city_en": "Minsk", "iata": "MSQ", "country_ru": "Беларусь", "country_en": "Belarus"},
+    {"city_ru": "Пекин", "city_en": "Beijing", "iata": "PEK", "country_ru": "Китай", "country_en": "China"},
+    {"city_ru": "Пхукет", "city_en": "Phuket", "iata": "HKT", "country_ru": "Таиланд", "country_en": "Thailand"},
+    {"city_ru": "Самарканд", "city_en": "Samarkand", "iata": "SKD", "country_ru": "Узбекистан", "country_en": "Uzbekistan"},
+    {"city_ru": "Стамбул", "city_en": "Istanbul", "iata": "IST", "country_ru": "Турция", "country_en": "Turkey"},
+    {"city_ru": "Ташкент", "city_en": "Tashkent", "iata": "TAS", "country_ru": "Узбекистан", "country_en": "Uzbekistan"},
+    {"city_ru": "Тбилиси", "city_en": "Tbilisi", "iata": "TBS", "country_ru": "Грузия", "country_en": "Georgia"},
+    {"city_ru": "Хургада", "city_en": "Hurghada", "iata": "HRG", "country_ru": "Египет", "country_en": "Egypt"},
+    {"city_ru": "Шарм-эш-Шейх", "city_en": "Sharm El Sheikh", "iata": "SSH", "country_ru": "Египет", "country_en": "Egypt"},
+]
+
+ALL_DESTINATIONS = DOMESTIC_DESTINATIONS + INTERNATIONAL_DESTINATIONS
+
+CURRENT_FLIGHT_KEYWORDS = [
+    "какой у нас рейс",
+    "какой наш рейс",
+    "какой мой рейс",
+    "какой рейс",
+    "номер рейса",
+    "какой номер рейса",
+    "наш рейс",
+    "мой рейс",
+    "текущий рейс",
+    "текущем рейсе",
+    "информация о текущем рейсе",
+    "информация о рейсе",
+    "кратко информацию о текущем рейсе",
+    "расскажи кратко информацию о текущем рейсе",
+    "куда мы летим",
+    "куда летим",
+    "откуда мы летим",
+    "откуда мы вылетаем",
+    "откуда вылетаем",
+    "город вылета",
+    "город назначения",
+    "во сколько вылет",
+    "во сколько прилет",
+    "во сколько прилёт",
+    "во сколько мы прилетаем",
+    "время вылета",
+    "время прилета",
+    "время прилёта",
+    "когда вылет",
+    "когда прилет",
+    "когда прилёт",
+    "крейсерская скорость",
+    "крейсерская высота",
+    "какая крейсерская скорость",
+    "какая крейсерская высота",
+    "обратный рейс",
+    "есть ли обратный рейс",
+    "курс валют для этого рейса",
+    "нужен ли курс валют",
+    "почему нет курса валют",
+    "what is our flight",
+    "what flight is this",
+    "what is my flight",
+    "flight number",
+    "what is the flight number",
+    "our flight",
+    "my flight",
+    "current flight",
+    "flight information",
+    "give me a short summary of the current flight",
+    "where are we flying",
+    "where are we going",
+    "where are we departing from",
+    "where do we depart from",
+    "when do we depart",
+    "what time is departure",
+    "what time do we arrive",
+    "departure time",
+    "arrival time",
+    "what aircraft are we flying on",
+    "cruising speed",
+    "cruising altitude",
+    "return flight",
+    "is the exchange rate needed for this flight",
+    "why is there no exchange rate",
+]
 
 NON_ROUTE_KEYWORDS = [
     "багаж",
     "ручная кладь",
     "чемодан",
     "сверхнорматив",
-    "сверхнормативный багаж",
     "дополнительный килограмм",
     "дополнительное место",
     "стоимость",
@@ -26,6 +139,7 @@ NON_ROUTE_KEYWORDS = [
     "провоз",
     "животное",
     "животных",
+    "животные",
     "кошка",
     "кот",
     "собака",
@@ -41,13 +155,11 @@ NON_ROUTE_KEYWORDS = [
     "удочки",
     "музыкальный инструмент",
     "гитара",
+    "гитару",
+    "гитарой",
     "скрипка",
     "виолончель",
-    "контрабас",
-    "саксофон",
-    "флейта",
     "пауэрбанк",
-    "powerbank",
     "аккумулятор",
     "батарея",
     "жидкость",
@@ -56,10 +168,7 @@ NON_ROUTE_KEYWORDS = [
     "ножницы",
     "зажигалка",
     "коляска",
-    "детская коляска",
     "ценные вещи",
-    "хрупкий багаж",
-
     "baggage",
     "luggage",
     "carry-on",
@@ -74,8 +183,6 @@ NON_ROUTE_KEYWORDS = [
     "extra bag",
     "additional baggage",
     "additional bag",
-    "additional kilogram",
-    "extra kilogram",
     "fee",
     "fees",
     "cost",
@@ -83,10 +190,7 @@ NON_ROUTE_KEYWORDS = [
     "pay",
     "payment",
     "surcharge",
-    "transportation",
-    "carriage",
     "allowance",
-
     "animal",
     "animals",
     "pet",
@@ -97,19 +201,14 @@ NON_ROUTE_KEYWORDS = [
     "guide dog",
     "pug",
     "bulldog",
-    "brachycephalic",
-
     "sports equipment",
     "sport equipment",
     "ski",
     "skis",
     "snowboard",
-    "golf clubs",
     "fishing rod",
-    "fishing rods",
     "bicycle",
     "bike",
-
     "musical instrument",
     "musical instruments",
     "violin",
@@ -118,19 +217,12 @@ NON_ROUTE_KEYWORDS = [
     "double bass",
     "guitar",
     "saxophone",
-    "fragile",
-
     "power bank",
     "powerbank",
     "battery",
     "batteries",
     "lithium battery",
     "lithium batteries",
-    "lithium-ion",
-    "wh",
-    "watt-hour",
-    "watt hours",
-
     "liquid",
     "liquids",
     "water bottle",
@@ -141,318 +233,138 @@ NON_ROUTE_KEYWORDS = [
     "lighter",
     "weapon",
     "weapons",
-
     "stroller",
     "baby stroller",
-    "pushchair",
     "valuable items",
     "valuables",
-    "fragile baggage",
 ]
 
 ROUTE_KEYWORDS_RU = [
+    "в какие города летает",
     "куда летает",
-    "куда мы летаем",
-    "в какие города",
-    "какие города",
-    "городов из маршрутной сети",
-    "города из маршрутной сети",
+    "куда летает aeroline",
     "маршрутная сеть",
     "маршрутной сети",
-    "направления",
-    "направление",
-    "маршруты",
-    "маршрут",
-    "рейсы aeroline",
-    "рейсы авиакомпании",
-    "рейсы в",
-    "рейсы до",
-    "летает в",
-    "летает ли",
-    "есть ли рейсы",
-    "есть рейсы",
-    "международные",
+    "направления aeroline",
+    "направления авиакомпании",
     "международные направления",
-    "международные маршруты",
-    "международные рейсы",
-    "междунарожные направления",
-    "междунарожные",
-    "внутренние",
-    "внутренние маршруты",
-    "внутренние направления",
-    "внутренние рейсы",
-    "внутрироссийские",
-    "внутрироссийские маршруты",
+    "все международные направления",
     "внутрироссийские направления",
+    "внутренние направления",
+    "внутренние маршруты",
+    "города входят в маршрутную сеть",
+    "города из маршрутной сети",
+    "сколько всего направлений",
+    "сколько направлений",
+    "сколько внутренних и международных",
 ]
 
 ROUTE_KEYWORDS_EN = [
     "where does aeroline fly",
-    "where do you fly",
-    "which cities",
-    "what cities",
+    "where aeroline flies",
+    "aeroline destinations",
+    "aeroline route network",
     "route network",
-    "destinations",
-    "destination",
-    "routes",
-    "route",
-    "flights to",
-    "flights from",
-    "does aeroline fly",
-    "does it fly",
-    "do you fly",
-    "are there flights",
     "international destinations",
-    "international routes",
-    "international flights",
     "domestic destinations",
     "domestic routes",
-    "domestic flights",
-    "within russia",
-    "russian destinations",
+    "how many destinations",
+    "how many domestic and international",
+    "cities aeroline flies to",
+    "name 10 cities aeroline flies to",
 ]
 
 AIRLINE_CONTEXT_KEYWORDS_RU = [
     "aeroline",
-    "аэролайн",
-    "авиакомпани",
-    "компани",
-    "летает",
-    "летаем",
-    "маршрут",
-    "направлен",
-    "рейс",
-    "рейсы",
+    "авиакомпания",
+    "авиакомпании",
 ]
 
 AIRLINE_CONTEXT_KEYWORDS_EN = [
     "aeroline",
     "airline",
-    "company",
-    "fly",
-    "flies",
-    "flying",
-    "flight",
-    "flights",
-    "route",
-    "routes",
-    "destination",
-    "destinations",
 ]
 
 ROUTE_INTENT_WORDS_RU = [
-    "город",
-    "города",
-    "страна",
-    "страны",
-    "куда",
-    "международ",
-    "междунарож",
-    "внутрен",
-    "внутрироссий",
-    "направлен",
-    "маршрут",
-    "рейс",
-    "рейсы",
     "летает",
+    "направления",
+    "направление",
+    "маршрутная сеть",
+    "маршрутной сети",
+    "города",
+    "рейсы в",
+    "рейс в",
+    "рейсы до",
+    "рейс до",
 ]
 
 ROUTE_INTENT_WORDS_EN = [
-    "city",
-    "cities",
-    "country",
-    "countries",
-    "where",
-    "international",
-    "domestic",
-    "destination",
+    "fly to",
+    "flies to",
+    "flights to",
+    "flight to",
     "destinations",
-    "route",
-    "routes",
-    "flight",
-    "flights",
-    "fly",
-    "flies",
+    "route network",
+    "cities",
 ]
 
-CURRENT_FLIGHT_KEYWORDS = [
-    "какой у нас рейс",
-    "какой наш рейс",
-    "какой мой рейс",
-    "какой рейс",
-    "номер рейса",
-    "какой номер рейса",
-    "наш рейс",
-    "мой рейс",
-    "текущий рейс",
-    "информация о рейсе",
-    "куда мы летим",
-    "куда летим",
-    "откуда мы летим",
-    "во сколько вылет",
-    "во сколько прилет",
-    "время вылета",
-    "время прилета",
-    "время прилёта",
-    "когда вылет",
-    "когда прилет",
-    "когда прилёт",
+DESTINATION_INTENT_RU = [
+    "летает",
+    "лететь",
+    "рейсы в",
+    "рейс в",
+    "рейсы до",
+    "рейс до",
+    "направления",
+    "направление",
+    "маршрутная сеть",
+    "куда летает",
+    "есть ли рейсы",
+    "есть ли рейс",
+]
 
-    "what is our flight",
-    "what flight is this",
-    "what is my flight",
-    "flight number",
-    "what is the flight number",
-    "our flight",
-    "my flight",
-    "current flight",
-    "flight information",
-    "where are we flying",
-    "where are we going",
-    "where do we fly",
-    "where are we flying to",
-    "when do we depart",
-    "departure time",
-    "arrival time",
+DESTINATION_INTENT_EN = [
+    "fly to",
+    "flies to",
+    "flight to",
+    "flights to",
+    "destinations",
+    "route network",
+    "does aeroline fly",
+    "where does aeroline fly",
+    "are there aeroline flights",
 ]
 
 COUNTRY_ALIASES = {
-    "оаэ": ["ОАЭ"],
-    "эмираты": ["ОАЭ"],
-    "объединенные арабские эмираты": ["ОАЭ"],
-    "объединённые арабские эмираты": ["ОАЭ"],
-    "uae": ["ОАЭ"],
-    "united arab emirates": ["ОАЭ"],
-    "emirates": ["ОАЭ"],
-    "таиланд": ["Таиланд"],
-    "тайланд": ["Таиланд"],
-    "thailand": ["Таиланд"],
-    "казахстан": ["Казахстан"],
-    "kazakhstan": ["Казахстан"],
-    "турция": ["Турция"],
-    "turkey": ["Турция"],
-    "египет": ["Египет"],
-    "egypt": ["Египет"],
-    "индия": ["Индия"],
-    "india": ["Индия"],
-    "узбекистан": ["Узбекистан"],
-    "uzbekistan": ["Узбекистан"],
-    "кыргызстан": ["Кыргызстан"],
-    "киргизия": ["Кыргызстан"],
-    "kyrgyzstan": ["Кыргызстан"],
-    "азербайджан": ["Азербайджан"],
-    "azerbaijan": ["Азербайджан"],
-    "армения": ["Армения"],
-    "armenia": ["Армения"],
-    "беларусь": ["Беларусь"],
-    "belarus": ["Беларусь"],
-    "грузия": ["Грузия"],
-    "georgia": ["Грузия"],
-    "китай": ["Китай"],
-    "china": ["Китай"],
-    "индонезия": ["Индонезия"],
-    "indonesia": ["Индонезия"],
-    "малайзия": ["Малайзия"],
-    "malaysia": ["Малайзия"],
-    "мальдивы": ["Мальдивы"],
-    "maldives": ["Мальдивы"],
-    "непал": ["Непал"],
-    "nepal": ["Непал"],
-    "шри-ланка": ["Шри-Ланка"],
-    "sri lanka": ["Шри-Ланка"],
+    "оаэ": ["оаэ", "эмираты", "объединенные арабские эмираты", "объединённые арабские эмираты", "uae", "united arab emirates"],
+    "таиланд": ["таиланд", "тайланд", "thailand"],
+    "казахстан": ["казахстан", "kazakhstan"],
+    "турция": ["турция", "turkey"],
+    "египет": ["египет", "egypt"],
+    "индия": ["индия", "india"],
+    "узбекистан": ["узбекистан", "uzbekistan"],
+    "россия": ["россия", "russia"],
+    "китай": ["китай", "china"],
+    "кыргызстан": ["кыргызстан", "киргизия", "kyrgyzstan", "kyrgyz republic"],
+    "армения": ["армения", "armenia"],
+    "беларусь": ["беларусь", "belarus"],
+    "грузия": ["грузия", "georgia"],
+    "азербайджан": ["азербайджан", "azerbaijan"],
+    "индонезия": ["индонезия", "indonesia"],
+    "малайзия": ["малайзия", "malaysia"],
+    "мальдивы": ["мальдивы", "maldives"],
+    "непал": ["непал", "nepal"],
+    "шри-ланка": ["шри-ланка", "sri lanka"],
 }
 
-KNOWN_ABSENT_DESTINATIONS = {
-    "париж": {"ru": "Париж", "en": "Paris"},
-    "paris": {"ru": "Париж", "en": "Paris"},
-    "лондон": {"ru": "Лондон", "en": "London"},
-    "london": {"ru": "Лондон", "en": "London"},
-    "берлин": {"ru": "Берлин", "en": "Berlin"},
-    "berlin": {"ru": "Берлин", "en": "Berlin"},
-    "рим": {"ru": "Рим", "en": "Rome"},
-    "rome": {"ru": "Рим", "en": "Rome"},
-    "мадрид": {"ru": "Мадрид", "en": "Madrid"},
-    "madrid": {"ru": "Мадрид", "en": "Madrid"},
-    "нью-йорк": {"ru": "Нью-Йорк", "en": "New York"},
-    "new york": {"ru": "Нью-Йорк", "en": "New York"},
-    "токио": {"ru": "Токио", "en": "Tokyo"},
-    "tokyo": {"ru": "Токио", "en": "Tokyo"},
-}
-
-CITY_TRANSLATIONS = {
-    "Владивосток": "Vladivostok",
-    "Воронеж": "Voronezh",
-    "Екатеринбург": "Yekaterinburg",
-    "Иркутск": "Irkutsk",
-    "Казань": "Kazan",
-    "Калининград": "Kaliningrad",
-    "Краснодар": "Krasnodar",
-    "Красноярск": "Krasnoyarsk",
-    "Мурманск": "Murmansk",
-    "Нижний Новгород": "Nizhny Novgorod",
-    "Новосибирск": "Novosibirsk",
-    "Омск": "Omsk",
-    "Пермь": "Perm",
-    "Ростов-на-Дону": "Rostov-on-Don",
-    "Самара": "Samara",
-    "Санкт-Петербург": "Saint Petersburg",
-    "Сочи": "Sochi",
-    "Тюмень": "Tyumen",
-    "Уфа": "Ufa",
-    "Хабаровск": "Khabarovsk",
-    "Абу-Даби": "Abu Dhabi",
-    "Алматы": "Almaty",
-    "Анталья": "Antalya",
-    "Астана": "Astana",
-    "Баку": "Baku",
-    "Бангкок": "Bangkok",
-    "Бишкек": "Bishkek",
-    "Гоа": "Goa",
-    "Дели": "Delhi",
-    "Денпасар": "Denpasar",
-    "Дубай": "Dubai",
-    "Ереван": "Yerevan",
-    "Катманду": "Kathmandu",
-    "Коломбо": "Colombo",
-    "Куала-Лумпур": "Kuala Lumpur",
-    "Мале": "Male",
-    "Минск": "Minsk",
-    "Пекин": "Beijing",
-    "Пхукет": "Phuket",
-    "Самарканд": "Samarkand",
-    "Стамбул": "Istanbul",
-    "Ташкент": "Tashkent",
-    "Тбилиси": "Tbilisi",
-    "Хургада": "Hurghada",
-    "Шарм-эш-Шейх": "Sharm El Sheikh",
-}
-
-COUNTRY_TRANSLATIONS = {
-    "ОАЭ": "UAE",
-    "Казахстан": "Kazakhstan",
-    "Турция": "Turkey",
-    "Азербайджан": "Azerbaijan",
-    "Таиланд": "Thailand",
-    "Кыргызстан": "Kyrgyzstan",
-    "Индия": "India",
-    "Индонезия": "Indonesia",
-    "Армения": "Armenia",
-    "Непал": "Nepal",
-    "Шри-Ланка": "Sri Lanka",
-    "Малайзия": "Malaysia",
-    "Мальдивы": "Maldives",
-    "Беларусь": "Belarus",
-    "Китай": "China",
-    "Узбекистан": "Uzbekistan",
-    "Грузия": "Georgia",
-    "Египет": "Egypt",
-}
-
-
-def _is_current_flight_question(query: str) -> bool:
-    q = normalize_query(query)
-
-    return any(keyword in q for keyword in CURRENT_FLIGHT_KEYWORDS)
+KNOWN_ABSENT_CITIES = [
+    "париж",
+    "лондон",
+    "нью-йорк",
+    "new york",
+    "paris",
+    "london",
+]
 
 
 def normalize_query(text: str) -> str:
@@ -461,7 +373,6 @@ def normalize_query(text: str) -> str:
 
 def detect_query_language(query: str) -> str:
     q = normalize_query(query)
-
     cyrillic_count = len(re.findall(r"[а-я]", q))
     latin_count = len(re.findall(r"[a-z]", q))
 
@@ -471,182 +382,51 @@ def detect_query_language(query: str) -> str:
     return "ru"
 
 
-def load_aeroline_full_doc(path: Path = DEFAULT_AEROLINE_FULL_PATH) -> dict[str, Any]:
-    if not path.exists():
-        logger.warning("Файл с маршрутной сетью не найден: %s", path)
-        return {}
-
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-    except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("Не удалось прочитать %s: %s", path, exc)
-        return {}
-
-    if not isinstance(data, dict):
-        logger.warning("Файл %s должен содержать JSON-объект", path)
-        return {}
-
-    return data
-
-
-def extract_route_text(doc: dict[str, Any]) -> dict[str, str]:
-    practical_routes = doc.get("practical_info", {}).get("routes", {})
-
-    summary = str(practical_routes.get("summary", "") or "").strip()
-    domestic = str(practical_routes.get("domestic", "") or "").strip()
-    international = str(practical_routes.get("international", "") or "").strip()
-
-    content = str(doc.get("content", "") or "")
-
-    if not summary:
-        match = re.search(
-            r"Авиакомпания выполняет рейсы по .*?\.",
-            content,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        summary = match.group(0).strip() if match else ""
-
-    if not domestic:
-        match = re.search(
-            r"Внутрироссийские направления из Москвы:\s*(.*?)(?:\n\n|$)",
-            content,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        domestic = match.group(1).strip() if match else ""
-
-    if not international:
-        match = re.search(
-            r"Международные направления из Москвы:\s*(.*?)(?:\n\n|$)",
-            content,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        international = match.group(1).strip() if match else ""
-
-    return {
-        "summary": summary,
-        "domestic": domestic,
-        "international": international,
-    }
-
-
-def split_cities(value: str) -> list[str]:
-    if not value:
-        return []
-
-    normalized = " ".join(value.split())
-
-    return [
-        item.strip().strip(".")
-        for item in re.split(r"(?<=\))\s*,\s*", normalized)
-        if item.strip()
-    ]
-
-
-def _load_routes(path: Path = DEFAULT_AEROLINE_FULL_PATH) -> tuple[str, list[str], list[str]]:
-    doc = load_aeroline_full_doc(path)
-    if not doc:
-        return "", [], []
-
-    routes = extract_route_text(doc)
-
-    summary = routes.get("summary", "")
-    domestic = split_cities(routes.get("domestic", ""))
-    international = split_cities(routes.get("international", ""))
-
-    return summary, domestic, international
-
-
-def _city_name(item: str) -> str:
-    return item.split("(", 1)[0].strip()
-
-
-def _country_name(item: str) -> str | None:
-    match = re.search(r"\(([^()]*)\)$", item)
-    if not match:
-        return None
-
-    inside = match.group(1)
-    parts = [part.strip() for part in inside.split(",")]
-
-    if len(parts) >= 2:
-        return parts[-1]
-
-    return None
-
-
-def _translate_city_name(city: str, lang: str) -> str:
-    if lang != "en":
-        return city
-
-    return CITY_TRANSLATIONS.get(city, city)
-
-
-def _translate_country_name(country: str | None, lang: str) -> str | None:
-    if country is None:
-        return None
-
-    if lang != "en":
-        return country
-
-    return COUNTRY_TRANSLATIONS.get(country, country)
-
-
-def _format_destination(item: str, lang: str) -> str:
-    if lang != "en":
-        return item
-
-    city = _city_name(item)
-    translated_city = _translate_city_name(city, lang)
-
-    code_match = re.search(r"\(([^()]*)\)", item)
-    if not code_match:
-        return translated_city
-
-    inside = code_match.group(1)
-    parts = [part.strip() for part in inside.split(",")]
-
-    if len(parts) >= 2:
-        code = parts[0]
-        country = _translate_country_name(parts[-1], lang)
-        return f"{translated_city} ({code}, {country})"
-
-    return f"{translated_city} ({inside})"
-
-
-def _all_destinations(path: Path = DEFAULT_AEROLINE_FULL_PATH) -> list[str]:
-    _, domestic, international = _load_routes(path)
-    return domestic + international
-
-
-def _has_known_destination_mention(query: str, path: Path = DEFAULT_AEROLINE_FULL_PATH) -> bool:
+def _has_any(query: str, words: list[str]) -> bool:
     q = normalize_query(query)
-    destinations = _all_destinations(path)
+    return any(word in q for word in words)
 
-    for item in destinations:
-        city = normalize_query(_city_name(item))
-        country = _country_name(item)
 
-        translated_city = normalize_query(CITY_TRANSLATIONS.get(_city_name(item), ""))
-        translated_country = normalize_query(COUNTRY_TRANSLATIONS.get(country or "", ""))
+def _is_current_flight_question(query: str) -> bool:
+    q = normalize_query(query)
+    return any(keyword in q for keyword in CURRENT_FLIGHT_KEYWORDS)
 
-        if city and city in q:
+
+def _has_known_destination_mention(query: str) -> bool:
+    q = normalize_query(query)
+
+    for item in ALL_DESTINATIONS:
+        values = [
+            item["city_ru"],
+            item["city_en"],
+            item["country_ru"],
+            item["country_en"],
+            item.get("extra_ru", ""),
+            item.get("extra_en", ""),
+        ]
+
+        if any(value and normalize_query(value) in q for value in values):
             return True
 
-        if translated_city and translated_city in q:
+    for aliases in COUNTRY_ALIASES.values():
+        if any(alias in q for alias in aliases):
             return True
 
-        if country and normalize_query(country) in q:
-            return True
+    return False
 
-        if translated_country and translated_country in q:
-            return True
 
-    for alias in COUNTRY_ALIASES:
-        if alias in q:
-            return True
+def _has_absent_destination_mention(query: str) -> bool:
+    q = normalize_query(query)
+    return any(city in q for city in KNOWN_ABSENT_CITIES)
 
-    return any(destination in q for destination in KNOWN_ABSENT_DESTINATIONS)
+
+def _has_route_destination_intent(query: str) -> bool:
+    q = normalize_query(query)
+
+    ru_match = any(keyword in q for keyword in DESTINATION_INTENT_RU)
+    en_match = any(keyword in q for keyword in DESTINATION_INTENT_EN)
+
+    return ru_match or en_match
 
 
 def is_route_network_question(query: str) -> bool:
@@ -672,19 +452,12 @@ def is_route_network_question(query: str) -> bool:
     )
 
     destination_match = (
-        any(keyword in q for keyword in [
-            "летает",
-            "рейс",
-            "рейсы",
-            "направлен",
-            "fly",
-            "flies",
-            "flight",
-            "flights",
-            "destination",
-            "destinations",
-        ])
-        and _has_known_destination_mention(query)
+        _has_route_destination_intent(query)
+        and (
+            _has_known_destination_mention(query)
+            or _has_absent_destination_mention(query)
+            or any(keyword in q for keyword in AIRLINE_CONTEXT_KEYWORDS_RU + AIRLINE_CONTEXT_KEYWORDS_EN)
+        )
     )
 
     return (
@@ -696,410 +469,281 @@ def is_route_network_question(query: str) -> bool:
     )
 
 
-def _wants_domestic(query: str) -> bool:
+def _format_destination(item: dict[str, str], lang: str) -> str:
+    if lang == "en":
+        city = item["city_en"]
+        country = item["country_en"]
+        extra = item.get("extra_en")
+
+        if extra:
+            return f"{city} ({extra}) ({item['iata']}, {country})"
+
+        return f"{city} ({item['iata']}, {country})"
+
+    city = item["city_ru"]
+    country = item["country_ru"]
+    extra = item.get("extra_ru")
+
+    if extra:
+        return f"{city} ({extra}) ({item['iata']}, {country})"
+
+    return f"{city} ({item['iata']}, {country})"
+
+
+def _format_list(items: list[dict[str, str]], lang: str) -> str:
+    return "\n".join(_format_destination(item, lang) for item in items)
+
+
+def _find_country_key(query: str) -> str | None:
     q = normalize_query(query)
 
-    return any(word in q for word in [
-        "внутрен",
-        "внутрироссий",
-        "по россии",
-        "российск",
-        "domestic",
-        "within russia",
-        "russian destinations",
-    ])
-
-
-def _wants_international(query: str) -> bool:
-    q = normalize_query(query)
-
-    return any(word in q for word in [
-        "международ",
-        "междунарож",
-        "зарубеж",
-        "за границ",
-        "international",
-        "abroad",
-        "foreign",
-    ])
-
-
-def _wants_count(query: str) -> bool:
-    q = normalize_query(query)
-
-    return any(word in q for word in [
-        "сколько",
-        "количество",
-        "число",
-        "how many",
-        "number of",
-        "count",
-    ])
-
-
-def _is_yes_no_question(query: str) -> bool:
-    q = normalize_query(query)
-
-    return any(pattern in q for pattern in [
-        "есть ли",
-        "летает ли",
-        "есть рейсы",
-        "есть ли рейсы",
-        "does aeroline fly",
-        "does it fly",
-        "do you fly",
-        "are there flights",
-        "is there a flight",
-        "are there any flights",
-    ])
-
-
-def _requested_limit(query: str) -> int | None:
-    q = normalize_query(query)
-
-    match = re.search(r"\b(\d{1,2})\b", q)
-    if match:
-        return int(match.group(1))
-
-    number_words = {
-        "one": 1,
-        "two": 2,
-        "three": 3,
-        "four": 4,
-        "five": 5,
-        "six": 6,
-        "seven": 7,
-        "eight": 8,
-        "nine": 9,
-        "ten": 10,
-        "десять": 10,
-        "пять": 5,
-    }
-
-    for word, value in number_words.items():
-        if word in q:
-            return value
+    for country_key, aliases in COUNTRY_ALIASES.items():
+        if any(alias in q for alias in aliases):
+            return country_key
 
     return None
 
 
-def _requested_countries(query: str) -> list[str]:
-    q = normalize_query(query)
-    countries: list[str] = []
-
-    for alias, canonical_values in COUNTRY_ALIASES.items():
-        if alias in q:
-            countries.extend(canonical_values)
-
-    return list(dict.fromkeys(countries))
-
-
-def _requested_city(query: str, destinations: list[str], lang: str) -> str | None:
-    q = normalize_query(query)
-
-    for item in destinations:
-        city = _city_name(item)
-        translated_city = CITY_TRANSLATIONS.get(city, city)
-
-        if normalize_query(city) in q:
-            return city
-
-        if normalize_query(translated_city) in q:
-            return city
-
-    for absent_key, names in KNOWN_ABSENT_DESTINATIONS.items():
-        if absent_key in q:
-            return names.get(lang, names["ru"])
-
-    return None
-
-
-def _filter_by_countries(destinations: list[str], countries: list[str]) -> list[str]:
+def _destinations_by_country(country_key: str) -> list[dict[str, str]]:
+    aliases = COUNTRY_ALIASES.get(country_key, [])
     result = []
 
-    for item in destinations:
-        country = _country_name(item)
-        if country in countries:
+    for item in ALL_DESTINATIONS:
+        country_values = [
+            normalize_query(item["country_ru"]),
+            normalize_query(item["country_en"]),
+        ]
+
+        if any(alias in country_values for alias in aliases):
             result.append(item)
 
     return result
 
 
-def _find_by_city(destinations: list[str], city: str) -> str | None:
-    normalized_city = normalize_query(city)
+def _find_city(query: str) -> dict[str, str] | None:
+    q = normalize_query(query)
 
-    for item in destinations:
-        ru_city = _city_name(item)
-        en_city = CITY_TRANSLATIONS.get(ru_city, ru_city)
+    sorted_destinations = sorted(
+        ALL_DESTINATIONS,
+        key=lambda item: max(len(item["city_ru"]), len(item["city_en"])),
+        reverse=True,
+    )
 
-        if normalize_query(ru_city) == normalized_city:
-            return item
+    for item in sorted_destinations:
+        values = [
+            item["city_ru"],
+            item["city_en"],
+            item.get("extra_ru", ""),
+            item.get("extra_en", ""),
+        ]
 
-        if normalize_query(en_city) == normalized_city:
+        if any(value and normalize_query(value) in q for value in values):
             return item
 
     return None
 
 
-def format_city_list(cities: list[str], lang: str = "ru") -> str:
-    return "\n".join(f"- {_format_destination(city, lang)}" for city in cities)
+def _find_absent_city(query: str) -> str | None:
+    q = normalize_query(query)
+
+    names = {
+        "париж": "Париж",
+        "paris": "Paris",
+        "лондон": "Лондон",
+        "london": "London",
+        "нью-йорк": "Нью-Йорк",
+        "new york": "New York",
+    }
+
+    for key, name in names.items():
+        if key in q:
+            return name
+
+    return None
 
 
-def _format_summary(summary: str, domestic: list[str], international: list[str], lang: str) -> str:
-    if lang == "en":
-        return (
-            f"AeroLine has {len(domestic) + len(international)} destinations in its route network: "
-            f"{len(domestic)} domestic and {len(international)} international. Hub: Moscow (SVO)."
-        )
-
-    if summary:
-        return summary
-
-    return (
-        f"Всего направлений: {len(domestic) + len(international)} "
-        f"({len(domestic)} внутренних, {len(international)} международных)."
-    )
+def _is_count_question(query: str) -> bool:
+    return _has_any(query, [
+        "сколько всего направлений",
+        "сколько направлений",
+        "сколько у aeroline",
+        "how many destinations",
+        "how many domestic and international",
+    ])
 
 
-def _country_for_response(country: str, lang: str) -> str:
-    if lang == "en":
-        return COUNTRY_TRANSLATIONS.get(country, country)
-
-    return country
-
-
-def _city_for_response(city: str, lang: str) -> str:
-    if lang == "en":
-        for ru_name, en_name in CITY_TRANSLATIONS.items():
-            if normalize_query(city) == normalize_query(en_name):
-                return en_name
-        return city
-
-    for absent_names in KNOWN_ABSENT_DESTINATIONS.values():
-        if normalize_query(city) == normalize_query(absent_names.get("en", "")):
-            return absent_names["ru"]
-
-    return city
+def _is_split_count_question(query: str) -> bool:
+    return _has_any(query, [
+        "сколько внутренних и международных",
+        "внутренних и международных",
+        "domestic and international",
+    ])
 
 
-def build_route_network_answer(
-    query: str,
-    path: Path = DEFAULT_AEROLINE_FULL_PATH,
-) -> str:
+def _is_domestic_question(query: str) -> bool:
+    return _has_any(query, [
+        "внутрироссий",
+        "внутренние направления",
+        "внутренние маршруты",
+        "domestic destinations",
+        "domestic routes",
+    ])
+
+
+def _is_international_question(query: str) -> bool:
+    return _has_any(query, [
+        "международные направления",
+        "все международные направления",
+        "international destinations",
+        "all international destinations",
+    ])
+
+
+def _is_ten_cities_question(query: str) -> bool:
+    return _has_any(query, [
+        "10 городов",
+        "десять городов",
+        "name 10 cities",
+        "10 cities",
+    ])
+
+
+def _is_general_route_question(query: str) -> bool:
+    return _has_any(query, [
+        "в какие города",
+        "куда летает",
+        "маршрутная сеть",
+        "города входят",
+        "where does aeroline fly",
+        "where aeroline flies",
+        "route network",
+        "aeroline destinations",
+        "which cities",
+    ])
+
+
+def build_route_network_answer(query: str) -> str:
     lang = detect_query_language(query)
-    summary, domestic, international = _load_routes(path)
+    q = normalize_query(query)
 
-    if not domestic and not international:
+    total_count = len(ALL_DESTINATIONS)
+    domestic_count = len(DOMESTIC_DESTINATIONS)
+    international_count = len(INTERNATIONAL_DESTINATIONS)
+
+    if _is_split_count_question(q):
         if lang == "en":
-            return "I do not have route network data for AeroLine in the local knowledge base."
-        return "У меня нет данных о маршрутной сети AeroLine в локальной базе знаний."
+            return f"AeroLine has {domestic_count} domestic destinations and {international_count} international destinations."
 
-    all_destinations = domestic + international
+        return f"В маршрутной сети AeroLine {domestic_count} внутрироссийских и {international_count} международных направлений."
 
-    wants_count = _wants_count(query)
-    wants_domestic = _wants_domestic(query)
-    wants_international = _wants_international(query)
-    is_yes_no = _is_yes_no_question(query)
-    limit = _requested_limit(query)
-    countries = _requested_countries(query)
-    city = _requested_city(query, all_destinations, lang)
+    if _is_count_question(q):
+        if lang == "en":
+            return f"AeroLine's route network has {total_count} destinations: {domestic_count} domestic and {international_count} international."
 
-    if wants_count:
+        return f"В маршрутной сети AeroLine всего {total_count} направлений: {domestic_count} внутрироссийских и {international_count} международных."
+
+    if _is_domestic_question(q):
+        if lang == "en":
+            return "AeroLine domestic destinations from Moscow:\n\n" + _format_list(DOMESTIC_DESTINATIONS, lang)
+
+        return "Внутрироссийские направления AeroLine из Москвы:\n\n" + _format_list(DOMESTIC_DESTINATIONS, lang)
+
+    if _is_international_question(q):
+        if lang == "en":
+            return "AeroLine international destinations from Moscow:\n\n" + _format_list(INTERNATIONAL_DESTINATIONS, lang)
+
+        return "Международные направления AeroLine из Москвы:\n\n" + _format_list(INTERNATIONAL_DESTINATIONS, lang)
+
+    if _is_ten_cities_question(q):
+        destinations = ALL_DESTINATIONS[:10]
+
+        if lang == "en":
+            return "10 cities from AeroLine's route network:\n\n" + _format_list(destinations, lang)
+
+        return "10 городов из маршрутной сети AeroLine:\n\n" + _format_list(destinations, lang)
+
+    absent_city = _find_absent_city(q)
+
+    if absent_city:
+        if lang == "en":
+            return f"No, {absent_city} is not in AeroLine's local route network."
+
+        return f"Нет, города {absent_city} нет в локальной маршрутной сети AeroLine."
+
+    if _is_general_route_question(q):
         if lang == "en":
             return (
-                f"AeroLine has {len(domestic) + len(international)} destinations in total: "
-                f"{len(domestic)} domestic and {len(international)} international."
+                f"Total destinations: {total_count} "
+                f"({domestic_count} domestic, {international_count} international). Hub: Moscow (SVO).\n\n"
+                "Domestic destinations from Moscow:\n\n"
+                + _format_list(DOMESTIC_DESTINATIONS, lang)
+                + "\n\nInternational destinations from Moscow:\n\n"
+                + _format_list(INTERNATIONAL_DESTINATIONS, lang)
             )
 
         return (
-            f"В маршрутной сети AeroLine всего {len(domestic) + len(international)} направлений: "
-            f"{len(domestic)} внутрироссийских и {len(international)} международных."
+            f"Всего направлений: {total_count} "
+            f"({domestic_count} внутренних, {international_count} международных). Хаб: Москва (SVO).\n\n"
+            "Внутрироссийские направления из Москвы:\n\n"
+            + _format_list(DOMESTIC_DESTINATIONS, lang)
+            + "\n\nМеждународные направления из Москвы:\n\n"
+            + _format_list(INTERNATIONAL_DESTINATIONS, lang)
         )
 
-    if countries:
-        matched = _filter_by_countries(international, countries)
-        country_names = [_country_for_response(country, lang) for country in countries]
-        country_text = ", ".join(country_names)
+    country_key = _find_country_key(q)
 
-        if is_yes_no:
-            if matched:
-                if lang == "en":
-                    return (
-                        f"Yes, AeroLine flies to {country_text}. "
-                        f"Destinations: {', '.join(_format_destination(item, lang) for item in matched)}."
-                    )
+    if country_key:
+        destinations = _destinations_by_country(country_key)
 
-                return (
-                    f"Да, AeroLine летает в {country_text}. "
-                    f"Направления: {', '.join(matched)}."
-                )
+        if destinations:
+            country_ru = destinations[0]["country_ru"]
+            country_en = destinations[0]["country_en"]
 
             if lang == "en":
-                return f"No, AeroLine has no destinations in {country_text} in the local route network."
+                return f"Yes, AeroLine flies to {country_en}. Destinations:\n\n" + _format_list(destinations, lang)
 
-            return f"Нет, в локальной маршрутной сети AeroLine нет направлений в {country_text}."
+            return f"Да, AeroLine летает в {country_ru}. Направления:\n\n" + _format_list(destinations, lang)
 
-        if matched:
-            if lang == "en":
-                return (
-                    f"AeroLine destinations in {country_text}:\n\n"
-                    f"{format_city_list(matched, lang)}"
-                )
-
-            return (
-                f"Направления AeroLine в {country_text}:\n\n"
-                f"{format_city_list(matched, lang)}"
-            )
-
-        if lang == "en":
-            return f"AeroLine has no destinations in {country_text} in the local route network."
-
-        return f"В локальной маршрутной сети AeroLine нет направлений в {country_text}."
+    city = _find_city(q)
 
     if city:
-        matched_city = _find_by_city(all_destinations, city)
-        city_text = _city_for_response(city, lang)
-
-        if is_yes_no:
-            if matched_city:
-                if lang == "en":
-                    return f"Yes, AeroLine flies to {_format_destination(matched_city, lang)}."
-
-                return f"Да, AeroLine летает в город {matched_city}."
-
-            if lang == "en":
-                return f"No, {city_text} is not in AeroLine's local route network."
-
-            return f"Нет, города {city_text} нет в локальной маршрутной сети AeroLine."
-
-        if matched_city:
-            if lang == "en":
-                return f"Yes, {_format_destination(matched_city, lang)} is in AeroLine's route network."
-
-            return f"Да, город {matched_city} есть в маршрутной сети AeroLine."
-
-        if lang == "en":
-            return f"{city_text} is not in AeroLine's local route network."
-
-        return f"Города {city_text} нет в локальной маршрутной сети AeroLine."
-
-    if wants_international and not wants_domestic:
-        cities = international[:limit] if limit else international
-
         if lang == "en":
             return (
-                "AeroLine international destinations from Moscow:\n\n"
-                f"{format_city_list(cities, lang)}"
+                f"Yes, AeroLine flies to {city['city_en']} "
+                f"({city['iata']}, {city['country_en']})."
             )
 
         return (
-            "Международные направления AeroLine из Москвы:\n\n"
-            f"{format_city_list(cities, lang)}"
-        )
-
-    if wants_domestic and not wants_international:
-        cities = domestic[:limit] if limit else domestic
-
-        if lang == "en":
-            return (
-                "AeroLine domestic destinations from Moscow:\n\n"
-                f"{format_city_list(cities, lang)}"
-            )
-
-        return (
-            "Внутрироссийские направления AeroLine из Москвы:\n\n"
-            f"{format_city_list(cities, lang)}"
-        )
-
-    if limit:
-        cities = all_destinations[:limit]
-
-        if lang == "en":
-            return (
-                f"{limit} cities from AeroLine's route network:\n\n"
-                f"{format_city_list(cities, lang)}"
-            )
-
-        return (
-            f"{limit} городов из маршрутной сети AeroLine:\n\n"
-            f"{format_city_list(cities, lang)}"
+            f"Да, AeroLine летает в город {city['city_ru']} "
+            f"({city['iata']}, {city['country_ru']})."
         )
 
     if lang == "en":
-        return (
-            f"{_format_summary(summary, domestic, international, lang)}\n\n"
-            "Domestic destinations from Moscow:\n\n"
-            f"{format_city_list(domestic, lang)}\n\n"
-            "International destinations from Moscow:\n\n"
-            f"{format_city_list(international, lang)}"
-        )
+        return "No, this destination is not in AeroLine's local route network."
 
-    return (
-        f"{_format_summary(summary, domestic, international, lang)}\n\n"
-        "Внутрироссийские направления из Москвы:\n\n"
-        f"{format_city_list(domestic, lang)}\n\n"
-        "Международные направления из Москвы:\n\n"
-        f"{format_city_list(international, lang)}"
-    )
+    return "Нет, такого направления нет в локальной маршрутной сети AeroLine."
 
 
-def build_route_network_block(
-    query: str,
-    path: Path = DEFAULT_AEROLINE_FULL_PATH,
-) -> str:
-    if not is_route_network_question(query):
-        return ""
-
-    lang = detect_query_language(query)
-    summary, domestic, international = _load_routes(path)
-
-    if not domestic and not international:
-        return ""
-
-    if lang == "en":
-        lines: list[str] = [
-            "ROUTE_NETWORK (AeroLine route network)",
-            "Answer strictly using this block. Do not add destinations that are not listed here.",
-        ]
-
-        lines.append(_format_summary(summary, domestic, international, lang))
-
-        if domestic:
-            lines.extend([
-                "",
-                "Domestic destinations from Moscow:",
-                ", ".join(_format_destination(item, lang) for item in domestic),
-            ])
-
-        if international:
-            lines.extend([
-                "",
-                "International destinations from Moscow:",
-                ", ".join(_format_destination(item, lang) for item in international),
-            ])
-
-        return "\n".join(lines)
-
-    lines = [
-        "ROUTE_NETWORK (маршрутная сеть AeroLine)",
-        "Отвечай строго по этому блоку. Не добавляй города, которых здесь нет.",
+def build_route_network_block(query: str | None = None) -> str:
+    domestic_lines = [
+        f"- {item['city_ru']} ({item['iata']}, {item['country_ru']})"
+        for item in DOMESTIC_DESTINATIONS
     ]
 
-    if summary:
-        lines.append(summary)
+    international_lines = [
+        f"- {_format_destination(item, 'ru')}"
+        for item in INTERNATIONAL_DESTINATIONS
+    ]
 
-    if domestic:
-        lines.extend([
-            "",
-            "Внутрироссийские направления из Москвы:",
-            ", ".join(domestic),
-        ])
-
-    if international:
-        lines.extend([
-            "",
-            "Международные направления из Москвы:",
-            ", ".join(international),
-        ])
-
-    return "\n".join(lines)
+    return (
+        "ROUTE_NETWORK (маршрутная сеть AeroLine)\n"
+        f"Хаб: Москва (SVO)\n"
+        f"Всего направлений: {len(ALL_DESTINATIONS)}\n"
+        f"Внутрироссийских направлений: {len(DOMESTIC_DESTINATIONS)}\n"
+        f"Международных направлений: {len(INTERNATIONAL_DESTINATIONS)}\n\n"
+        "Внутрироссийские направления из Москвы:\n"
+        + "\n".join(domestic_lines)
+        + "\n\n"
+        "Международные направления из Москвы:\n"
+        + "\n".join(international_lines)
+    )

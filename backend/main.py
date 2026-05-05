@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend import chat_db
 from backend.api import chat as chat_api
-from backend.api import admin as admin_api
+from backend.api import sync as sync_api
 from backend.db.database import get_db, init_db
 from backend.db.models import CommercialOffer, Flight, MenuItem
 from backend.db.queries import get_commercial_offers, get_flight_info, get_menu
@@ -63,10 +63,15 @@ class ChatResponse(BaseModel):
 
 
 # Сборка блока FLIGHT из SQLite
-def _format_menu_item(item: MenuItem) -> str:
-    name = item.name_ru or item.name_en or "Меню"
-    description = item.description_ru or item.description_en or ""
-    price = "включено в билет" if not item.price else f"{item.price:g} руб."
+def _format_menu_item(item: MenuItem, lang: str = "ru") -> str:
+    if lang == "en":
+        name = item.name_en or item.name_ru or "Menu"
+        description = item.description_en or item.description_ru or ""
+        price = "included in the ticket" if not item.price else f"{item.price:g} RUB"
+    else:
+        name = item.name_ru or item.name_en or "Меню"
+        description = item.description_ru or item.description_en or ""
+        price = "включено в билет" if not item.price else f"{item.price:g} руб."
 
     if description:
         return f"- {name}: {description} — {price}"
@@ -74,7 +79,7 @@ def _format_menu_item(item: MenuItem) -> str:
     return f"- {name} — {price}"
 
 
-def build_flight_block(db: Session) -> str:
+def build_flight_block(db: Session, lang: str = "ru") -> str:
     flight_obj = db.query(Flight).first()
     if not flight_obj:
         return ""
@@ -86,66 +91,128 @@ def build_flight_block(db: Session) -> str:
     origin = route.origin_city if route else "—"
     destination = route.destination_city if route else "—"
 
-    lines = [
-        "=== FLIGHT (информация о текущем рейсе) ===",
-        f"Рейс: {flight_obj.flight_number}",
-        f"Маршрут: {origin} → {destination}",
-        f"Тип рейса: {'внутренний' if is_domestic else 'международный'}",
-        f"Вылет: {flight_obj.departure_time}",
-        f"Прибытие: {flight_obj.arrival_time}",
-        f"Воздушное судно: {aircraft.aircraft_type if aircraft else '—'} "
-        f"(бортовой номер {aircraft.registration if aircraft else '—'})",
-        f"Крейсерская высота: {flight_obj.cruising_altitude or '—'} м",
-        f"Крейсерская скорость: {flight_obj.cruising_speed or '—'} км/ч",
-    ]
+    if lang == "en":
+        lines = [
+            "=== FLIGHT (current flight information) ===",
+            f"Flight: {flight_obj.flight_number}",
+            f"Route: {origin} → {destination}",
+            f"Flight type: {'domestic' if is_domestic else 'international'}",
+            f"Departure: {flight_obj.departure_time}",
+            f"Arrival: {flight_obj.arrival_time}",
+            f"Aircraft: {aircraft.aircraft_type if aircraft else '—'} "
+            f"(registration {aircraft.registration if aircraft else '—'})",
+            f"Cruising altitude: {flight_obj.cruising_altitude or '—'} m",
+            f"Cruising speed: {flight_obj.cruising_speed or '—'} km/h",
+        ]
+    else:
+        lines = [
+            "=== FLIGHT (информация о текущем рейсе) ===",
+            f"Рейс: {flight_obj.flight_number}",
+            f"Маршрут: {origin} → {destination}",
+            f"Тип рейса: {'внутренний' if is_domestic else 'международный'}",
+            f"Вылет: {flight_obj.departure_time}",
+            f"Прибытие: {flight_obj.arrival_time}",
+            f"Воздушное судно: {aircraft.aircraft_type if aircraft else '—'} "
+            f"(бортовой номер {aircraft.registration if aircraft else '—'})",
+            f"Крейсерская высота: {flight_obj.cruising_altitude or '—'} м",
+            f"Крейсерская скорость: {flight_obj.cruising_speed or '—'} км/ч",
+        ]
 
-    if flight_obj.weather_description_ru or flight_obj.weather_temp_celsius is not None:
+    if flight_obj.weather_description_ru or flight_obj.weather_description_en or flight_obj.weather_temp_celsius is not None:
         weather_parts = []
 
-        if flight_obj.weather_description_ru:
-            weather_parts.append(flight_obj.weather_description_ru)
+        if lang == "en":
+            weather_description = flight_obj.weather_description_en or flight_obj.weather_description_ru
+        else:
+            weather_description = flight_obj.weather_description_ru or flight_obj.weather_description_en
+
+        if weather_description:
+            weather_parts.append(weather_description)
 
         if flight_obj.weather_temp_celsius is not None:
             temp_text = f"{flight_obj.weather_temp_celsius:+d}°C"
             if temp_text not in " ".join(weather_parts):
                 weather_parts.append(temp_text)
 
-        lines.extend([
-            "",
-            f"Текущая погода в пункте назначения ({destination}): " + ", ".join(weather_parts),
-        ])
+        if lang == "en":
+            lines.extend([
+                "",
+                f"Current weather at destination ({destination}): " + ", ".join(weather_parts),
+            ])
+        else:
+            lines.extend([
+                "",
+                f"Текущая погода в пункте назначения ({destination}): " + ", ".join(weather_parts),
+            ])
 
     if is_domestic:
-        lines.extend([
-            "",
-            "Курс валюты: рейс внутренний, курс валют для пункта назначения не используется.",
-        ])
+        if lang == "en":
+            lines.extend([
+                "",
+                "Exchange rate: this is a domestic flight, so exchange rate information is not used for the destination.",
+            ])
+        else:
+            lines.extend([
+                "",
+                "Курс валюты: рейс внутренний, курс валют для пункта назначения не используется.",
+            ])
     else:
         exchange_text = None
 
-        if flight_obj.exchange_rate_note_ru:
-            exchange_text = flight_obj.exchange_rate_note_ru
-        elif flight_obj.exchange_rate_currency and flight_obj.exchange_rate_to_rub:
-            exchange_text = (
-                f"1 {flight_obj.exchange_rate_currency} = "
-                f"{flight_obj.exchange_rate_to_rub:g} ₽"
-            )
+        if lang == "en":
+            if flight_obj.exchange_rate_note_en:
+                exchange_text = flight_obj.exchange_rate_note_en
+            elif flight_obj.exchange_rate_note_ru:
+                exchange_text = flight_obj.exchange_rate_note_ru
+        else:
+            if flight_obj.exchange_rate_note_ru:
+                exchange_text = flight_obj.exchange_rate_note_ru
+            elif flight_obj.exchange_rate_note_en:
+                exchange_text = flight_obj.exchange_rate_note_en
+
+        if not exchange_text and flight_obj.exchange_rate_currency and flight_obj.exchange_rate_to_rub:
+            if lang == "en":
+                exchange_text = (
+                    f"1 {flight_obj.exchange_rate_currency} = "
+                    f"{flight_obj.exchange_rate_to_rub:g} RUB"
+                )
+            else:
+                exchange_text = (
+                    f"1 {flight_obj.exchange_rate_currency} = "
+                    f"{flight_obj.exchange_rate_to_rub:g} ₽"
+                )
 
         if exchange_text:
-            lines.extend([
-                "",
-                f"Курс валюты для пункта назначения: {exchange_text}",
-            ])
+            if lang == "en":
+                lines.extend([
+                    "",
+                    f"Exchange rate at destination: {exchange_text}",
+                ])
+            else:
+                lines.extend([
+                    "",
+                    f"Курс валюты для пункта назначения: {exchange_text}",
+                ])
 
     if flight_obj.return_flight_number:
-        lines.extend([
-            "",
-            "Обратный рейс:",
-            f"  Рейс: {flight_obj.return_flight_number}",
-            f"  Маршрут: {destination} → {origin}",
-            f"  Вылет: {flight_obj.return_departure_time or '—'}",
-            f"  Прибытие: {flight_obj.return_arrival_time or '—'}",
-        ])
+        if lang == "en":
+            lines.extend([
+                "",
+                "Return flight:",
+                f"  Flight: {flight_obj.return_flight_number}",
+                f"  Route: {destination} → {origin}",
+                f"  Departure: {flight_obj.return_departure_time or '—'}",
+                f"  Arrival: {flight_obj.return_arrival_time or '—'}",
+            ])
+        else:
+            lines.extend([
+                "",
+                "Обратный рейс:",
+                f"  Рейс: {flight_obj.return_flight_number}",
+                f"  Маршрут: {destination} → {origin}",
+                f"  Вылет: {flight_obj.return_departure_time or '—'}",
+                f"  Прибытие: {flight_obj.return_arrival_time or '—'}",
+            ])
 
     menu_items = (
         db.query(MenuItem)
@@ -159,23 +226,29 @@ def build_flight_block(db: Session) -> str:
 
     if economy_menu:
         lines.append("")
-        lines.append("Питание эконом-класса:")
+        lines.append("Economy class meal:" if lang == "en" else "Питание эконом-класса:")
         for item in economy_menu:
-            lines.append(_format_menu_item(item))
+            lines.append(_format_menu_item(item, lang))
 
     if business_menu:
         lines.append("")
-        lines.append("Питание бизнес-класса:")
+        lines.append("Business class meal:" if lang == "en" else "Питание бизнес-класса:")
         for item in business_menu:
-            lines.append(_format_menu_item(item))
+            lines.append(_format_menu_item(item, lang))
 
     offers = db.query(CommercialOffer).filter(CommercialOffer.flight_id == flight_obj.id).all()
     if offers:
         lines.append("")
-        lines.append("Специальные предложения:")
+        lines.append("Special offers:" if lang == "en" else "Специальные предложения:")
+
         for offer in offers:
-            title = offer.title_ru or offer.title_en or "Предложение"
-            description = offer.description_ru or offer.description_en or ""
+            if lang == "en":
+                title = offer.title_en or offer.title_ru or "Offer"
+                description = offer.description_en or offer.description_ru or ""
+            else:
+                title = offer.title_ru or offer.title_en or "Предложение"
+                description = offer.description_ru or offer.description_en or ""
+
             lines.append(f"- {title}: {description}")
 
     return "\n".join(lines)
@@ -306,14 +379,15 @@ Answer:"""
 
 
 def build_prompt(user_message: str, db: Session) -> str:
+    lang = detect_language(user_message)
+
     route_network_block = build_route_network_block(user_message)
-    flight_block = build_flight_block(db)
+    flight_block = build_flight_block(db, lang)
     knowledge_block = build_knowledge_block(user_message)
 
     blocks = [b for b in (route_network_block, knowledge_block, flight_block) if b]
     context = "\n\n".join(blocks) if blocks else "(контекст отсутствует)"
 
-    lang = detect_language(user_message)
     template = SYSTEM_PROMPT_EN if lang == "en" else SYSTEM_PROMPT_RU
     logger.info("Detected language: %s", lang)
     return template.format(context=context, question=user_message)
@@ -358,11 +432,11 @@ chat_api.register_processor(process_message)
 
 app.include_router(chat_api.router)
 
+app.include_router(sync_api.router)
+
 # Статика (CSS, JS) и шаблоны (HTML) для UI
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 templates = Jinja2Templates(directory="frontend/templates")
-
-app.include_router(admin_api.router)
 
 
 # Эндпоинты
@@ -386,9 +460,3 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     logger.info("Запрос: %s", request.message[:120])
     answer = await process_message(request.message, db)
     return ChatResponse(response=answer)
-
-
-@app.get("/admin", response_class=HTMLResponse)
-@app.get("/admin/", response_class=HTMLResponse)
-async def admin_ui(request: Request):
-    return templates.TemplateResponse(request, "admin.html")

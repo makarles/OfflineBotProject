@@ -125,7 +125,6 @@ BAGGAGE_KEYWORDS_EN = [
     "battery",
     "batteries",
     "lithium",
-    "wh",
     "watt-hour",
     "watt hours",
     "knife",
@@ -136,7 +135,6 @@ BAGGAGE_KEYWORDS_EN = [
     "weapons",
     "animal",
     "animals",
-    "pet",
     "pets",
     "cat",
     "dog",
@@ -478,7 +476,7 @@ def build_baggage_answer(query: str) -> str:
             "Liquids are allowed in hand luggage only in containers of up to 100 ml each. All containers must fit into one transparent bag of up to 1 liter.",
         )
 
-    if _has_any(q, ["пауэрбанк", "пауэрбанка", "пауэрбанков", "power bank", "powerbank", "power banks", "аккумулятор", "аккумуляторы", "батарея", "батареи", "battery", "batteries", "литий", "lithium", "втч", "wh"]):
+    if _has_any(q, ["пауэрбанк", "пауэрбанка", "пауэрбанков", "power bank", "powerbank", "power banks", "аккумулятор", "аккумуляторы", "батарея", "батареи", "battery", "batteries", "литий", "lithium", "втч"]):
         wh = _extract_wh(q)
         count = _extract_powerbank_count(q)
 
