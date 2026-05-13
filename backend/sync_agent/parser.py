@@ -9,7 +9,7 @@ KNOWLEDGE_BASE_DIR = Path("data/knowledge_base/cities")
 KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# Все наши направления
+# Все направления
 CITIES = [
     # Российские города
     {"city": "Москва", "iata": "SVO", "country": "Россия",

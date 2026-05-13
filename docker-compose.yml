@@ -1,0 +1,32 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: skyassist-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: skyassist-app
+    depends_on:
+      - ollama
+    ports:
+      - "8000:8000"   # Passenger chatbot
+      - "8500:8500"   # Airline admin panel
+    environment:
+      OLLAMA_URL: http://ollama:11434/api/generate
+      OLLAMA_MODEL: llama3.1:8b
+      OLLAMA_TIMEOUT: 120
+      SKYASSIST_DATABASE_URL: sqlite:///./data/skyassist.db
+      RAG_TOP_K: 6
+      RAG_CONTEXT_CHUNKS: 10
+      BUILD_RAG_INDEX: "0"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

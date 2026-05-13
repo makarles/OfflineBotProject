@@ -336,13 +336,12 @@ SYSTEM_PROMPT_RU = """Ты — бортовой ассистент авиако�
    В блоке KNOWLEDGE содержатся общеклиматические сведения по сезонам — не используй
    их как ответ на вопрос «какая погода сейчас» или «сколько градусов».
 10. Не пиши слово "KNOWLEDGE" в ответе.
-   
+
 КОНТЕКСТ:
 {context}
 
 Вопрос: {question}
 Ответ:"""
-
 
 SYSTEM_PROMPT_EN = """You are an in-flight assistant for AeroLine airline.
 
