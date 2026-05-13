@@ -90,8 +90,7 @@
 ### 1. Склонировать репозиторий и скачать папку /data
 
 ```bash
-git clone https://github.com/<username>/<repository>.git
-cd <repository>
+git clone https://github.com/makarles/offlinebotproject.git
 ```
 
 ### 2. Собрать и запустить контейнеры
